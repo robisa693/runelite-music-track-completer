@@ -1,4 +1,4 @@
-package com.robisa693.musictrackcompleter;
+package com.robisa693.musiccapehelper;
 
 import java.awt.Color;
 import java.awt.Component;
@@ -36,15 +36,15 @@ import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
 
-class MusicTrackCompleterPanel extends PluginPanel
+class MusicCapeHelperPanel extends PluginPanel
 {
     private static final Color COLOR_UNLOCKED = new Color(90, 220, 90);
     private static final Color COLOR_LOCKED = new Color(220, 90, 90);
     private static final Color COLOR_HINT = new Color(180, 180, 180);
     private static final Color COLOR_HEADER = Color.WHITE;
 
-    private final MusicTrackCompleterPlugin plugin;
-    private final MusicTrackCompleterConfig config;
+    private final MusicCapeHelperPlugin plugin;
+    private final MusicCapeHelperConfig config;
     private final ConfigManager configManager;
     private final OkHttpClient okHttpClient;
     private final Client client;
@@ -56,7 +56,7 @@ class MusicTrackCompleterPanel extends PluginPanel
     private JPanel trackListPanel;
     private String filterText = "";
 
-    MusicTrackCompleterPanel(MusicTrackCompleterPlugin plugin, MusicTrackCompleterConfig config, ConfigManager configManager, OkHttpClient okHttpClient, Client client, ClientThread clientThread)
+    MusicCapeHelperPanel(MusicCapeHelperPlugin plugin, MusicCapeHelperConfig config, ConfigManager configManager, OkHttpClient okHttpClient, Client client, ClientThread clientThread)
     {
         this.plugin = plugin;
         this.config = config;
@@ -100,7 +100,7 @@ class MusicTrackCompleterPanel extends PluginPanel
         missingOnlyCheck.addActionListener(e ->
         {
             boolean selected = missingOnlyCheck.isSelected();
-            configManager.setConfiguration("musictrackcompleter", "showMissingOnly", selected);
+            configManager.setConfiguration("musiccapehelper", "showMissingOnly", selected);
             rebuild();
         });
         missingOnlyCheck.setSelected(config.showMissingOnly());
@@ -125,7 +125,7 @@ class MusicTrackCompleterPanel extends PluginPanel
 
     void rebuild()
     {
-        SwingUtilities.invokeLater(() ->
+        clientThread.invokeLater(() ->
         {
             List<TrackData> tracks = plugin.getVisibleTracks();
             Map<Integer, Boolean> unlockedState = plugin.getUnlockedState();
@@ -238,7 +238,7 @@ class MusicTrackCompleterPanel extends PluginPanel
 
         Request request = new Request.Builder()
             .url(apiUrl)
-            .header("User-Agent", "MusicTrackCompleter/1.0")
+            .header("User-Agent", "MusicCapeHelper/1.0")
             .build();
 
         okHttpClient.newCall(request).enqueue(new Callback()

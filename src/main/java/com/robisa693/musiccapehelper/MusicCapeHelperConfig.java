@@ -1,12 +1,12 @@
-package com.robisa693.musictrackcompleter;
+package com.robisa693.musiccapehelper;
 
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
 
-@ConfigGroup("musictrackcompleter")
-public interface MusicTrackCompleterConfig extends Config
+@ConfigGroup("musiccapehelper")
+public interface MusicCapeHelperConfig extends Config
 {
     @ConfigSection(
         name = "Display",

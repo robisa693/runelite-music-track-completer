@@ -1,4 +1,4 @@
-package com.robisa693.musictrackcompleter;
+package com.robisa693.musiccapehelper;
 
 import com.google.common.base.Strings;
 import com.google.gson.Gson;
@@ -32,14 +32,14 @@ import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.util.ImageUtil;
 
 @PluginDescriptor(
-    name = "Music Track Completer",
+    name = "Music Cape Helper",
     description = "Helps you complete the music log and unlock the music cape. Shows all music tracks by area, their unlock hints, and which are still missing.",
-    tags = {"music", "track", "tracker", "cape", "completionist", "log", "unlock", "hint", "area", "collection", "progress", "wiki"}
+    tags = {"music", "cape", "track", "tracker", "completionist", "log", "unlock", "hint", "area", "collection", "progress", "wiki"}
 )
-public class MusicTrackCompleterPlugin extends Plugin
+public class MusicCapeHelperPlugin extends Plugin
 {
-    private static final Logger log = LoggerFactory.getLogger(MusicTrackCompleterPlugin.class);
-    private static final String CONFIG_GROUP = "musictrackcompleter";
+    private static final Logger log = LoggerFactory.getLogger(MusicCapeHelperPlugin.class);
+    private static final String CONFIG_GROUP = "musiccapehelper";
     private static final String KEY_UNLOCKED_MAP = "unlockedMap";
     private static final Type MAP_TYPE = new TypeToken<Map<Integer, Boolean>>() {}.getType();
 
@@ -61,8 +61,8 @@ public class MusicTrackCompleterPlugin extends Plugin
     @Inject
     private OkHttpClient okHttpClient;
 
-    private MusicTrackCompleterConfig config;
-    private MusicTrackCompleterPanel panel;
+    private MusicCapeHelperConfig config;
+    private MusicCapeHelperPanel panel;
     private NavigationButton navButton;
     private Map<Integer, Boolean> unlockedState = new HashMap<>();
 
@@ -73,9 +73,9 @@ public class MusicTrackCompleterPlugin extends Plugin
     {
         config = getConfig(configManager);
         loadUnlockedState();
-        panel = new MusicTrackCompleterPanel(this, config, configManager, okHttpClient, client, clientThread);
+        panel = new MusicCapeHelperPanel(this, config, configManager, okHttpClient, client, clientThread);
         navButton = NavigationButton.builder()
-            .tooltip("Music Track Completer")
+            .tooltip("Music Cape Helper")
             .icon(ImageUtil.loadImageResource(getClass(), "icon.png"))
             .priority(5)
             .panel(panel)
@@ -95,9 +95,9 @@ public class MusicTrackCompleterPlugin extends Plugin
     }
 
     @Provides
-    MusicTrackCompleterConfig getConfig(ConfigManager configManager)
+    MusicCapeHelperConfig getConfig(ConfigManager configManager)
     {
-        return configManager.getConfig(MusicTrackCompleterConfig.class);
+        return configManager.getConfig(MusicCapeHelperConfig.class);
     }
 
     @Subscribe
