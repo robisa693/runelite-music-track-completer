@@ -33,8 +33,8 @@ import net.runelite.client.util.ImageUtil;
 
 @PluginDescriptor(
     name = "Music Track Completer",
-    description = "Shows music tracks by area with unlock hints, helping you complete the music log",
-    tags = {"music", "collection", "completionist", "tracker", "log"}
+    description = "Helps you complete the music log and unlock the music cape. Shows all music tracks by area, their unlock hints, and which are still missing.",
+    tags = {"music", "track", "tracker", "cape", "completionist", "log", "unlock", "hint", "area", "collection", "progress", "wiki"}
 )
 public class MusicTrackCompleterPlugin extends Plugin
 {
