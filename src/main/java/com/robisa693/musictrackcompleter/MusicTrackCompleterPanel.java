@@ -7,7 +7,7 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.io.InputStream;
+import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -21,6 +21,7 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
@@ -29,6 +30,12 @@ import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.ui.PluginPanel;
 import net.runelite.client.util.LinkBrowser;
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 
 class MusicTrackCompleterPanel extends PluginPanel
 {
@@ -40,6 +47,7 @@ class MusicTrackCompleterPanel extends PluginPanel
     private final MusicTrackCompleterPlugin plugin;
     private final MusicTrackCompleterConfig config;
     private final ConfigManager configManager;
+    private final OkHttpClient okHttpClient;
     private final Client client;
     private final ClientThread clientThread;
 
@@ -49,11 +57,12 @@ class MusicTrackCompleterPanel extends PluginPanel
     private JPanel trackListPanel;
     private String filterText = "";
 
-    MusicTrackCompleterPanel(MusicTrackCompleterPlugin plugin, MusicTrackCompleterConfig config, ConfigManager configManager, Client client, ClientThread clientThread)
+    MusicTrackCompleterPanel(MusicTrackCompleterPlugin plugin, MusicTrackCompleterConfig config, ConfigManager configManager, OkHttpClient okHttpClient, Client client, ClientThread clientThread)
     {
         this.plugin = plugin;
         this.config = config;
         this.configManager = configManager;
+        this.okHttpClient = okHttpClient;
         this.client = client;
         this.clientThread = clientThread;
 
@@ -172,23 +181,6 @@ class MusicTrackCompleterPanel extends PluginPanel
         row.setLayout(new BoxLayout(row, BoxLayout.Y_AXIS));
         row.setAlignmentX(Component.LEFT_ALIGNMENT);
         row.setBorder(BorderFactory.createEmptyBorder(4, 6, 4, 6));
-        row.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-
-        row.setToolTipText("<html><body style='width:250px'>"
-            + "<b>" + track.displayName + "</b><br>"
-            + "<i>" + AreaResolver.getAreaName(track.areaId) + "</i><br>"
-            + (!track.unlockHint.isEmpty() ? track.unlockHint + "<br>" : "")
-            + "<br><span style='color:#aaaaaa'>Click to open OSRS Wiki</span>"
-            + "</body></html>");
-
-        row.addMouseListener(new MouseAdapter()
-        {
-            @Override
-            public void mouseClicked(MouseEvent e)
-            {
-                resolveAndBrowse(track.displayName);
-            }
-        });
 
         Boolean unlocked = unlockedState.get(track.dbRow);
         boolean isUnlocked = unlocked != null && unlocked;
@@ -214,40 +206,71 @@ class MusicTrackCompleterPanel extends PluginPanel
         areaLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         row.add(areaLabel);
 
+        if (config.wikiLookup())
+        {
+            row.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            row.setToolTipText("<html><body style='width:250px'>"
+                + "<b>" + track.displayName + "</b><br>"
+                + "<i>" + AreaResolver.getAreaName(track.areaId) + "</i><br>"
+                + (!track.unlockHint.isEmpty() ? track.unlockHint + "<br>" : "")
+                + "<br><span style='color:#aaaaaa'>Click to open OSRS Wiki</span>"
+                + "</body></html>");
+
+            row.addMouseListener(new MouseAdapter()
+            {
+                @Override
+                public void mouseClicked(MouseEvent e)
+                {
+                    resolveAndBrowse(track.displayName);
+                }
+            });
+        }
+
         return row;
     }
 
-    private static void resolveAndBrowse(String trackName)
+    private void resolveAndBrowse(String trackName)
     {
-        new Thread(() ->
+        String plainUrl = wikiUrlForTrack(trackName);
+        String apiEncoded = URLEncoder.encode(trackName, StandardCharsets.UTF_8);
+        String apiUrl = "https://oldschool.runescape.wiki/api.php?action=query&titles="
+            + apiEncoded + "_(music_track)&format=json&redirects=1";
+
+        Request request = new Request.Builder()
+            .url(apiUrl)
+            .header("User-Agent", "MusicTrackCompleter/1.0")
+            .build();
+
+        okHttpClient.newCall(request).enqueue(new Callback()
         {
-            String url = wikiUrlForTrack(trackName);
-            try
+            @Override
+            public void onFailure(Call call, IOException e)
             {
-                String apiEncoded = URLEncoder.encode(trackName, StandardCharsets.UTF_8.name());
-                String apiUrl = "https://oldschool.runescape.wiki/api.php?action=query&titles="
-                    + apiEncoded + "_(music_track)&format=json&redirects=1";
+                browseUrl(plainUrl);
+            }
 
-                java.net.URLConnection conn = new java.net.URL(apiUrl).openConnection();
-                conn.setConnectTimeout(3000);
-                conn.setReadTimeout(3000);
-                conn.setRequestProperty("User-Agent", "MusicTrackCompleter/1.0");
-
-                try (InputStream in = conn.getInputStream())
+            @Override
+            public void onResponse(Call call, Response response) throws IOException
+            {
+                try (ResponseBody body = response.body())
                 {
-                    String json = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+                    String json = body.string();
                     if (!json.contains("\"missing\""))
                     {
-                        url = wikiUrlForTrack(trackName) + "_(music_track)";
+                        browseUrl(plainUrl + "_(music_track)");
+                    }
+                    else
+                    {
+                        browseUrl(plainUrl);
                     }
                 }
             }
-            catch (Exception e)
-            {
-                // fallback to plain URL
-            }
-            LinkBrowser.browse(url);
-        }).start();
+        });
+    }
+
+    private static void browseUrl(String url)
+    {
+        SwingUtilities.invokeLater(() -> LinkBrowser.browse(url));
     }
 
     private static String wikiUrlForTrack(String name)

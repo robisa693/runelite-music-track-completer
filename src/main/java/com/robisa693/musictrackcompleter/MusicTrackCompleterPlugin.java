@@ -6,7 +6,6 @@ import com.google.gson.reflect.TypeToken;
 import com.google.inject.Provides;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -14,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
+import okhttp3.OkHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import net.runelite.api.Client;
@@ -58,6 +58,9 @@ public class MusicTrackCompleterPlugin extends Plugin
     @Inject
     private Gson gson;
 
+    @Inject
+    private OkHttpClient okHttpClient;
+
     private MusicTrackCompleterConfig config;
     private MusicTrackCompleterPanel panel;
     private NavigationButton navButton;
@@ -70,7 +73,7 @@ public class MusicTrackCompleterPlugin extends Plugin
     {
         config = getConfig(configManager);
         loadUnlockedState();
-        panel = new MusicTrackCompleterPanel(this, config, configManager, client, clientThread);
+        panel = new MusicTrackCompleterPanel(this, config, configManager, okHttpClient, client, clientThread);
         navButton = NavigationButton.builder()
             .tooltip("Music Track Completer")
             .icon(ImageUtil.loadImageResource(getClass(), "icon.png"))
@@ -163,6 +166,8 @@ public class MusicTrackCompleterPlugin extends Plugin
             String unlockHint = readDBString(dbrow, DBTableID.Music.COL_UNLOCKHINT);
             int areaId = readDBInt(dbrow, DBTableID.Music.COL_AREA);
             boolean hidden = readDBBoolean(dbrow, DBTableID.Music.COL_HIDDEN);
+
+            log.debug("Track: {} areaId={}", displayName, areaId);
 
             tracks.add(new TrackData(dbrow, displayName, unlockHint != null ? unlockHint : "", areaId, hidden));
         }
