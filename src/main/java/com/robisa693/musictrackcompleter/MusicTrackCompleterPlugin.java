@@ -85,7 +85,10 @@ public class MusicTrackCompleterPlugin extends Plugin
     @Override
     protected void shutDown()
     {
-        clientToolbar.removeNavigation(navButton);
+        if (navButton != null)
+        {
+            clientToolbar.removeNavigation(navButton);
+        }
     }
 
     @Provides
