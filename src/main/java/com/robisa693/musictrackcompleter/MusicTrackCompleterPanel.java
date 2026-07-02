@@ -19,7 +19,6 @@ import javax.swing.BoxLayout;
 import javax.swing.JCheckBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JScrollPane;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
@@ -112,10 +111,7 @@ class MusicTrackCompleterPanel extends PluginPanel
         trackListPanel.setLayout(new BoxLayout(trackListPanel, BoxLayout.Y_AXIS));
         trackListPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JScrollPane scrollPane = new JScrollPane(trackListPanel);
-        scrollPane.setAlignmentX(Component.LEFT_ALIGNMENT);
-        scrollPane.setBorder(null);
-        add(scrollPane);
+        add(trackListPanel);
 
         revalidate();
         rebuild();
