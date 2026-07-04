@@ -20,6 +20,8 @@ import org.slf4j.LoggerFactory;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.coords.WorldPoint;
+import net.runelite.api.gameval.InterfaceID;
+import net.runelite.api.widgets.Widget;
 import net.runelite.api.worldmap.WorldMap;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.ui.overlay.worldmap.WorldMapPoint;
@@ -99,54 +101,70 @@ class MapNavigator
         }
 
         WorldPoint wp = new WorldPoint(c.get(0).intValue(), c.get(1).intValue(), c.get(2).intValue());
-        log.info("navigateTo: {} -> {}", trackName, wp);
-
-        pendingTarget = wp;
+        log.debug("navigateTo: {} -> {}", trackName, wp);
 
         clientThread.invoke(() ->
         {
-            log.info("navigateTo: running on client thread, setting hint arrow to {}", wp);
             try
             {
                 client.setHintArrow(wp);
-                log.info("navigateTo: hint arrow set successfully");
             }
             catch (Exception e)
             {
                 log.warn("navigateTo: setHintArrow failed", e);
             }
 
-            client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Music Cape: track marked at (" + wp.getX() + ", " + wp.getY() + "). Open world map (F9) to see marker.", null);
-
             addMapPoint(wp, first.name);
             startBlinking();
+
+            if (isWorldMapOpen())
+            {
+                // Map is already open: center it now. WORLDMAP_LOADMAP will not fire
+                // again for a region that is already loaded, so we cannot rely on onMapLoaded().
+                pendingTarget = null;
+                centerMap(wp);
+            }
+            else
+            {
+                // Map is closed: remember the target and center it once the user opens the
+                // map (WORLDMAP_LOADMAP -> onMapLoaded fires when the map first loads).
+                pendingTarget = wp;
+                client.addChatMessage(ChatMessageType.GAMEMESSAGE, "",
+                    "Music Cape: track marked. Open the world map (F9) to jump to it.", null);
+            }
         });
     }
 
     void onMapLoaded()
     {
-        log.info("onMapLoaded called");
         if (pendingTarget == null)
         {
-            log.info("onMapLoaded: pendingTarget is null, skipping");
             return;
         }
         WorldPoint target = pendingTarget;
         pendingTarget = null;
-        log.info("onMapLoaded: centering map on {}", target);
-        clientThread.invoke(() ->
+        log.debug("onMapLoaded: centering map on {}", target);
+        clientThread.invoke(() -> centerMap(target));
+    }
+
+    private void centerMap(WorldPoint wp)
+    {
+        WorldMap wm = client.getWorldMap();
+        if (wm != null)
         {
-            WorldMap wm = client.getWorldMap();
-            if (wm != null)
-            {
-                wm.setWorldMapPositionTarget(target);
-                log.info("onMapLoaded: setWorldMapPositionTarget done");
-            }
-            else
-            {
-                log.warn("onMapLoaded: world map is null");
-            }
-        });
+            wm.setWorldMapPositionTarget(wp);
+            log.debug("centerMap: setWorldMapPositionTarget {}", wp);
+        }
+        else
+        {
+            log.warn("centerMap: world map is null");
+        }
+    }
+
+    private boolean isWorldMapOpen()
+    {
+        Widget mapView = client.getWidget(InterfaceID.Worldmap.MAP_CONTAINER);
+        return mapView != null && !mapView.isHidden();
     }
 
     private void addMapPoint(WorldPoint wp, String name)
