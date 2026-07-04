@@ -118,19 +118,21 @@ class MapNavigator
         WorldPoint wp = new WorldPoint(c.get(0).intValue(), c.get(1).intValue(), c.get(2).intValue());
         log.debug("navigateTo: {} -> {}", trackName, wp);
 
-        if (wp.getY() >= UNDERGROUND_Y)
-        {
-            // The world map surface cannot render underground / instanced coordinates,
-            // so a marker there would never show. Send the user to the wiki instead.
-            log.debug("navigateTo: {} is underground ({}), falling back to wiki", trackName, wp);
-            clientThread.invoke(() -> client.addChatMessage(ChatMessageType.GAMEMESSAGE, "",
-                "Music Cape: " + trackName + " is underground and can't be shown on the world map - opening the wiki.", null));
-            fallback.run();
-            return;
-        }
-
         clientThread.invoke(() ->
         {
+            if (!isSurface(wp))
+            {
+                // The RuneLite world map only renders the surface: WorldMapOverlay drops any
+                // point where WorldMapData.surfaceContainsPosition() is false (underground /
+                // instanced regions live on separate map areas). No plugin - clue helper
+                // included - can mark those, so send the user to the wiki instead.
+                log.debug("navigateTo: {} is not on the surface map ({}), falling back to wiki", trackName, wp);
+                client.addChatMessage(ChatMessageType.GAMEMESSAGE, "",
+                    "Music Cape: " + trackName + " is underground and can't be shown on the world map - opening the wiki.", null);
+                fallback.run();
+                return;
+            }
+
             try
             {
                 client.setHintArrow(wp);
@@ -191,6 +193,19 @@ class MapNavigator
     {
         Widget mapView = client.getWidget(InterfaceID.Worldmap.MAP_CONTAINER);
         return mapView != null && !mapView.isHidden();
+    }
+
+    private boolean isSurface(WorldPoint wp)
+    {
+        WorldMap wm = client.getWorldMap();
+        if (wm != null && wm.getWorldMapData() != null)
+        {
+            // Exact gate used by WorldMapOverlay when deciding whether a point can be drawn.
+            return wm.getWorldMapData().surfaceContainsPosition(wp.getX(), wp.getY());
+        }
+        // World map never opened this session, so its data is not loaded yet: approximate
+        // with the underground coordinate band (surface coordinates stay below y=6400).
+        return wp.getY() < UNDERGROUND_Y;
     }
 
     private void addMapPoint(WorldPoint wp, String name)
