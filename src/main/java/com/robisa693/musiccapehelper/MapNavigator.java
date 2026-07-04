@@ -11,6 +11,7 @@ import java.io.InputStreamReader;
 import javax.swing.Timer;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -19,6 +20,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
+import net.runelite.api.Player;
+import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.widgets.Widget;
@@ -47,9 +50,16 @@ class MapNavigator
     private final Gson gson;
 
     private Map<String, List<MapLocation>> coordsMap = new HashMap<>();
-    private WorldMapPoint activeMapPoint;
+    private final List<WorldMapPoint> activeMapPoints = new ArrayList<>();
     private WorldPoint pendingTarget;
-    private BufferedImage mapIcon;
+    private final BufferedImage mapIcon;
+
+    // Active navigation target: written on the client thread, read by overlays
+    // (which also render on the client thread) and the panel (EDT) - keep the
+    // list reference immutable and volatile.
+    private volatile String activeTrack;
+    private volatile List<ActiveLocation> activeLocations = Collections.emptyList();
+    private WorldPoint hintArrowPoint;
 
     private InfoBox openMapInfoBox;
     private Timer flashTimer;
@@ -96,70 +106,176 @@ class MapNavigator
         return locs != null && !locs.isEmpty();
     }
 
+    String getActiveTrack()
+    {
+        return activeTrack;
+    }
+
+    List<ActiveLocation> getActiveLocations()
+    {
+        return activeLocations;
+    }
+
+    BufferedImage getMapIcon()
+    {
+        return mapIcon;
+    }
+
     void navigateTo(String trackName, Runnable fallback)
     {
-        List<MapLocation> locs = getLocations(trackName);
-        if (locs.isEmpty())
+        List<ActiveLocation> parsed = new ArrayList<>();
+        for (MapLocation loc : getLocations(trackName))
         {
-            log.debug("navigateTo: no coords for '{}', falling back", trackName);
+            List<Number> c = loc.center;
+            if (c == null || c.size() < 3)
+            {
+                continue;
+            }
+            WorldPoint wp = new WorldPoint(c.get(0).intValue(), c.get(1).intValue(), c.get(2).intValue());
+            if (parsed.stream().noneMatch(a -> a.point.equals(wp)))
+            {
+                parsed.add(new ActiveLocation(loc.name != null ? loc.name : trackName, wp, loc.polygon));
+            }
+        }
+
+        if (parsed.isEmpty())
+        {
+            log.debug("navigateTo: no usable coords for '{}', falling back", trackName);
             fallback.run();
             return;
         }
-
-        MapLocation first = locs.get(0);
-        List<Number> c = first.center;
-        if (c == null || c.size() < 3)
-        {
-            log.debug("navigateTo: no center for '{}', falling back", trackName);
-            fallback.run();
-            return;
-        }
-
-        WorldPoint wp = new WorldPoint(c.get(0).intValue(), c.get(1).intValue(), c.get(2).intValue());
-        log.debug("navigateTo: {} -> {}", trackName, wp);
 
         clientThread.invoke(() ->
         {
-            if (!isSurface(wp))
+            clearActiveState();
+            activeTrack = trackName;
+            activeLocations = Collections.unmodifiableList(parsed);
+
+            List<ActiveLocation> surface = new ArrayList<>();
+            for (ActiveLocation a : parsed)
             {
-                // The RuneLite world map only renders the surface: WorldMapOverlay drops any
-                // point where WorldMapData.surfaceContainsPosition() is false (underground /
-                // instanced regions live on separate map areas). No plugin - clue helper
-                // included - can mark those, so send the user to the wiki instead.
-                log.debug("navigateTo: {} is not on the surface map ({}), falling back to wiki", trackName, wp);
+                if (isSurface(a.point))
+                {
+                    surface.add(a);
+                }
+            }
+
+            for (ActiveLocation a : surface)
+            {
+                addMapPoint(a.point, a.name);
+            }
+
+            if (surface.isEmpty())
+            {
+                // Every location is underground / instanced: the world map cannot render
+                // those regions (WorldMapOverlay drops any point not on the surface), so
+                // open the wiki to show where to travel. The hint arrow and the in-scene
+                // highlight still guide the player once they are near the spot.
                 client.addChatMessage(ChatMessageType.GAMEMESSAGE, "",
-                    "Music Cape: " + trackName + " is underground and can't be shown on the world map - opening the wiki.", null);
+                    "Music Cape: " + trackName + " is underground and can't be shown on the world map"
+                        + " - opening the wiki. The spot will be highlighted in-game when you're nearby.", null);
                 fallback.run();
                 return;
             }
 
-            try
-            {
-                client.setHintArrow(wp);
-            }
-            catch (Exception e)
-            {
-                log.warn("navigateTo: setHintArrow failed", e);
-            }
-
-            addMapPoint(wp, first.name);
+            WorldPoint primary = nearestTo(playerLocation(), surface).point;
 
             if (isWorldMapOpen())
             {
                 // Map is already open: center it now. WORLDMAP_LOADMAP will not fire
                 // again for a region that is already loaded, so we cannot rely on onMapLoaded().
                 pendingTarget = null;
-                removeOpenMapInfoBox();
-                centerMap(wp);
+                centerMap(primary);
             }
             else
             {
                 // Map is closed: remember the target and flash an indicator until the user
                 // opens the map (WORLDMAP_LOADMAP -> onMapLoaded fires when it first loads).
-                pendingTarget = wp;
-                showOpenMapIndicator(first.name != null ? first.name : trackName);
+                pendingTarget = primary;
+                showOpenMapIndicator(trackName);
             }
         });
+    }
+
+    /**
+     * Runs every game tick (client thread). Keeps the hint arrow pointing at the
+     * nearest active location that is inside the loaded scene - the same gating the
+     * clue scroll plugin uses, which is what makes it work underground as well.
+     */
+    void onGameTick(boolean showArrow)
+    {
+        List<ActiveLocation> locs = activeLocations;
+        if (!showArrow || locs.isEmpty())
+        {
+            clearOwnHintArrow();
+            return;
+        }
+
+        List<ActiveLocation> inScene = new ArrayList<>();
+        for (ActiveLocation a : locs)
+        {
+            // fromWorld returns null when the point is outside the loaded scene or on
+            // a different plane - the same gate the in-scene highlight overlay uses.
+            if (LocalPoint.fromWorld(client, a.point) != null)
+            {
+                inScene.add(a);
+            }
+        }
+
+        if (inScene.isEmpty())
+        {
+            clearOwnHintArrow();
+            return;
+        }
+
+        WorldPoint best = nearestTo(playerLocation(), inScene).point;
+        if (!best.equals(hintArrowPoint))
+        {
+            client.setHintArrow(best);
+            hintArrowPoint = best;
+        }
+    }
+
+    private void clearOwnHintArrow()
+    {
+        if (hintArrowPoint != null)
+        {
+            // Only clear the arrow if it is still the one we set, so we never
+            // stomp an arrow owned by the game or another plugin.
+            if (hintArrowPoint.equals(client.getHintArrowPoint()))
+            {
+                client.clearHintArrow();
+            }
+            hintArrowPoint = null;
+        }
+    }
+
+    private WorldPoint playerLocation()
+    {
+        Player local = client.getLocalPlayer();
+        return local != null ? local.getWorldLocation() : null;
+    }
+
+    private static ActiveLocation nearestTo(WorldPoint from, List<ActiveLocation> locs)
+    {
+        if (from == null || locs.size() == 1)
+        {
+            return locs.get(0);
+        }
+        ActiveLocation best = locs.get(0);
+        long bestDist = Long.MAX_VALUE;
+        for (ActiveLocation a : locs)
+        {
+            long dx = a.point.getX() - from.getX();
+            long dy = a.point.getY() - from.getY();
+            long d = dx * dx + dy * dy;
+            if (d < bestDist)
+            {
+                bestDist = d;
+                best = a;
+            }
+        }
+        return best;
     }
 
     void onMapLoaded()
@@ -195,7 +311,7 @@ class MapNavigator
         return mapView != null && !mapView.isHidden();
     }
 
-    private boolean isSurface(WorldPoint wp)
+    boolean isSurface(WorldPoint wp)
     {
         WorldMap wm = client.getWorldMap();
         if (wm != null && wm.getWorldMapData() != null)
@@ -210,8 +326,6 @@ class MapNavigator
 
     private void addMapPoint(WorldPoint wp, String name)
     {
-        removeMapPoint();
-
         WorldMapPoint point = WorldMapPoint.builder()
             .worldPoint(wp)
             .image(mapIcon)
@@ -222,16 +336,16 @@ class MapNavigator
             .build();
 
         worldMapPointManager.add(point);
-        activeMapPoint = point;
+        activeMapPoints.add(point);
     }
 
-    void removeMapPoint()
+    private void removeMapPoints()
     {
-        if (activeMapPoint != null)
+        for (WorldMapPoint point : activeMapPoints)
         {
-            worldMapPointManager.remove(activeMapPoint);
-            activeMapPoint = null;
+            worldMapPointManager.remove(point);
         }
+        activeMapPoints.clear();
     }
 
     // ------------------------------------------------------------------
@@ -310,15 +424,20 @@ class MapNavigator
         }
     }
 
-    void clear()
+    /** Must run on the client thread. */
+    private void clearActiveState()
     {
         removeOpenMapInfoBox();
         pendingTarget = null;
-        clientThread.invoke(() ->
-        {
-            removeMapPoint();
-            client.clearHintArrow();
-        });
+        activeTrack = null;
+        activeLocations = Collections.emptyList();
+        removeMapPoints();
+        clearOwnHintArrow();
+    }
+
+    void clear()
+    {
+        clientThread.invoke(this::clearActiveState);
     }
 
     private static BufferedImage createMapIcon()
@@ -332,6 +451,20 @@ class MapNavigator
         g.drawOval(1, 1, 12, 12);
         g.dispose();
         return img;
+    }
+
+    static class ActiveLocation
+    {
+        final String name;
+        final WorldPoint point;
+        final List<List<Number>> polygon;
+
+        ActiveLocation(String name, WorldPoint point, List<List<Number>> polygon)
+        {
+            this.name = name;
+            this.point = point;
+            this.polygon = polygon;
+        }
     }
 
     static class MapLocation

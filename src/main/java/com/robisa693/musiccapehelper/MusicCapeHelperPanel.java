@@ -171,10 +171,24 @@ class MusicCapeHelperPanel extends PluginPanel
             }
         });
 
+        JLabel clearLabel = createToggleLabel(" ✕ ");
+        clearLabel.setBackground(COLOR_TOGGLE_INACTIVE);
+        clearLabel.setForeground(Color.GRAY);
+        clearLabel.setToolTipText("Clear the marked track (map marker, highlights and hint arrow)");
+        clearLabel.addMouseListener(new MouseAdapter()
+        {
+            @Override
+            public void mouseClicked(MouseEvent e)
+            {
+                mapNavigator.clear();
+            }
+        });
+
         bar.add(wikiToggle);
         bar.add(Box.createRigidArea(new Dimension(4, 0)));
         bar.add(mapToggle);
         bar.add(Box.createHorizontalGlue());
+        bar.add(clearLabel);
 
         return bar;
     }
@@ -218,50 +232,59 @@ class MusicCapeHelperPanel extends PluginPanel
 
     void rebuild()
     {
+        // Gather game state on the client thread, then apply all Swing
+        // mutations on the EDT - mixing the two freezes the client.
         clientThread.invokeLater(() ->
         {
             List<TrackData> tracks = plugin.getVisibleTracks();
-            Map<Integer, Boolean> unlockedState = plugin.getUnlockedState();
-
+            Map<Integer, Boolean> unlockedState = new java.util.HashMap<>(plugin.getUnlockedState());
             long total = plugin.getTotalTracks();
             long unlocked = plugin.getUnlockedCount();
-            summaryLabel.setText("Tracks: " + unlocked + " / " + total + " unlocked");
-
-            boolean hasData = !plugin.getUnlockedState().isEmpty();
-
-            List<TrackData> filtered = tracks.stream()
-                .filter(t -> filterText.isEmpty() || t.displayName.toLowerCase().contains(filterText))
-                .collect(Collectors.toList());
-
-            trackListPanel.removeAll();
-
-            if (!hasData)
-            {
-                JLabel empty = new JLabel("Open the Music tab\nto populate this list.");
-                empty.setForeground(COLOR_HINT);
-                empty.setAlignmentX(Component.LEFT_ALIGNMENT);
-                trackListPanel.add(empty);
-            }
-            else if (filtered.isEmpty())
-            {
-                JLabel empty = new JLabel("No tracks match\nyour filter.");
-                empty.setForeground(COLOR_HINT);
-                empty.setAlignmentX(Component.LEFT_ALIGNMENT);
-                trackListPanel.add(empty);
-            }
-            else
-            {
-                for (TrackData track : filtered)
-                {
-                    trackListPanel.add(createTrackRow(track, unlockedState));
-                    trackListPanel.add(Box.createRigidArea(new Dimension(0, 4)));
-                }
-            }
-
-            trackListPanel.revalidate();
-            trackListPanel.repaint();
-            revalidate();
+            SwingUtilities.invokeLater(() -> rebuildUI(tracks, unlockedState, total, unlocked));
         });
+    }
+
+    private void rebuildUI(List<TrackData> tracks, Map<Integer, Boolean> unlockedState, long total, long unlocked)
+    {
+        clickMode = config.clickMode();
+        updateToggleColors();
+
+        summaryLabel.setText("Tracks: " + unlocked + " / " + total + " unlocked");
+
+        boolean hasData = !unlockedState.isEmpty();
+
+        List<TrackData> filtered = tracks.stream()
+            .filter(t -> filterText.isEmpty() || t.displayName.toLowerCase().contains(filterText))
+            .collect(Collectors.toList());
+
+        trackListPanel.removeAll();
+
+        if (!hasData)
+        {
+            JLabel empty = new JLabel("Open the Music tab\nto populate this list.");
+            empty.setForeground(COLOR_HINT);
+            empty.setAlignmentX(Component.LEFT_ALIGNMENT);
+            trackListPanel.add(empty);
+        }
+        else if (filtered.isEmpty())
+        {
+            JLabel empty = new JLabel("No tracks match\nyour filter.");
+            empty.setForeground(COLOR_HINT);
+            empty.setAlignmentX(Component.LEFT_ALIGNMENT);
+            trackListPanel.add(empty);
+        }
+        else
+        {
+            for (TrackData track : filtered)
+            {
+                trackListPanel.add(createTrackRow(track, unlockedState));
+                trackListPanel.add(Box.createRigidArea(new Dimension(0, 4)));
+            }
+        }
+
+        trackListPanel.revalidate();
+        trackListPanel.repaint();
+        revalidate();
     }
 
     private JPanel createTrackRow(TrackData track, Map<Integer, Boolean> unlockedState)
@@ -354,17 +377,13 @@ class MusicCapeHelperPanel extends PluginPanel
     private String coordString(String trackName)
     {
         List<MapNavigator.MapLocation> locs = mapNavigator.getLocations(trackName);
-        if (locs.isEmpty())
-        {
-            return "[?]";
-        }
-        MapNavigator.MapLocation first = locs.get(0);
-        List<Number> c = first.center;
+        List<Number> c = locs.isEmpty() ? null : locs.get(0).center;
         if (c == null || c.size() < 3)
         {
             return "[?]";
         }
-        return "[" + c.get(0).intValue() + ", " + c.get(1).intValue() + ", " + c.get(2).intValue() + "]";
+        String coords = "[" + c.get(0).intValue() + ", " + c.get(1).intValue() + ", " + c.get(2).intValue() + "]";
+        return locs.size() > 1 ? coords + " +" + (locs.size() - 1) + " more" : coords;
     }
 
     private void resolveAndBrowse(String trackName)

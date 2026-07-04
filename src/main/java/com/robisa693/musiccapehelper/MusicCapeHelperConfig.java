@@ -63,4 +63,59 @@ public interface MusicCapeHelperConfig extends Config
     {
         return ClickMode.WIKI;
     }
+
+    @ConfigSection(
+        name = "In-game Guidance",
+        description = "How the marked track location is shown in the game world",
+        position = 20
+    )
+    String guidanceSection = "guidance";
+
+    @ConfigItem(
+        keyName = "showSceneHighlight",
+        name = "Highlight location in scene",
+        description = "Highlight the track's unlock spot on the ground when you are nearby (works in dungeons too)",
+        position = 21,
+        section = guidanceSection
+    )
+    default boolean showSceneHighlight()
+    {
+        return true;
+    }
+
+    @ConfigItem(
+        keyName = "showHintArrow",
+        name = "Show hint arrow",
+        description = "Show the minimap hint arrow when you are near the marked track's unlock spot",
+        position = 22,
+        section = guidanceSection
+    )
+    default boolean showHintArrow()
+    {
+        return true;
+    }
+
+    @ConfigItem(
+        keyName = "showMapAreaHighlight",
+        name = "Highlight area on world map",
+        description = "Draw the track's unlock area as a highlighted region on the world map, not just a dot",
+        position = 23,
+        section = guidanceSection
+    )
+    default boolean showMapAreaHighlight()
+    {
+        return true;
+    }
+
+    @ConfigItem(
+        keyName = "highlightColor",
+        name = "Highlight color",
+        description = "Color used for the map area, scene highlight and marker",
+        position = 24,
+        section = guidanceSection
+    )
+    default java.awt.Color highlightColor()
+    {
+        return new java.awt.Color(255, 200, 0);
+    }
 }

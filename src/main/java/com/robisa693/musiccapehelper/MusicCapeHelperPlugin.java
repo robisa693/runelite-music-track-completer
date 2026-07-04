@@ -20,6 +20,7 @@ import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.ScriptID;
 import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ScriptCallbackEvent;
 import net.runelite.api.events.ScriptPostFired;
 import net.runelite.api.gameval.DBTableID;
@@ -31,6 +32,7 @@ import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
+import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.ui.overlay.infobox.InfoBoxManager;
 import net.runelite.client.ui.overlay.worldmap.WorldMapPointManager;
 import net.runelite.client.util.ImageUtil;
@@ -71,9 +73,14 @@ public class MusicCapeHelperPlugin extends Plugin
     @Inject
     private InfoBoxManager infoBoxManager;
 
+    @Inject
+    private OverlayManager overlayManager;
+
     private MusicCapeHelperConfig config;
     private MusicCapeHelperPanel panel;
     private MapNavigator mapNavigator;
+    private MusicSceneOverlay sceneOverlay;
+    private MusicMapAreaOverlay mapAreaOverlay;
     private NavigationButton navButton;
     private Map<Integer, Boolean> unlockedState = new HashMap<>();
 
@@ -85,6 +92,10 @@ public class MusicCapeHelperPlugin extends Plugin
         config = getConfig(configManager);
         loadUnlockedState();
         mapNavigator = new MapNavigator(this, client, clientThread, worldMapPointManager, infoBoxManager, gson);
+        sceneOverlay = new MusicSceneOverlay(client, config, mapNavigator);
+        mapAreaOverlay = new MusicMapAreaOverlay(client, config, mapNavigator);
+        overlayManager.add(sceneOverlay);
+        overlayManager.add(mapAreaOverlay);
         panel = new MusicCapeHelperPanel(this, config, configManager, okHttpClient, client, clientThread, mapNavigator);
         navButton = NavigationButton.builder()
             .tooltip("Music Cape Helper")
@@ -100,6 +111,14 @@ public class MusicCapeHelperPlugin extends Plugin
     @Override
     protected void shutDown()
     {
+        if (sceneOverlay != null)
+        {
+            overlayManager.remove(sceneOverlay);
+        }
+        if (mapAreaOverlay != null)
+        {
+            overlayManager.remove(mapAreaOverlay);
+        }
         if (mapNavigator != null)
         {
             mapNavigator.clear();
@@ -107,6 +126,15 @@ public class MusicCapeHelperPlugin extends Plugin
         if (navButton != null)
         {
             clientToolbar.removeNavigation(navButton);
+        }
+    }
+
+    @Subscribe
+    public void onGameTick(GameTick event)
+    {
+        if (mapNavigator != null)
+        {
+            mapNavigator.onGameTick(config.showHintArrow());
         }
     }
 
