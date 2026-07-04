@@ -14,19 +14,13 @@ public interface MusicCapeHelperConfig extends Config
         MAP
     }
 
-    @ConfigSection(
-        name = "Display",
-        description = "Display options",
-        position = 0
-    )
-    String displaySection = "display";
-
+    // Controlled from the side panel; hidden here so the settings UI does not
+    // duplicate the panel controls. The keys still persist between sessions.
     @ConfigItem(
         keyName = "showMissingOnly",
         name = "Show missing only",
         description = "Only show tracks that are still locked",
-        position = 1,
-        section = displaySection
+        hidden = true
     )
     default boolean showMissingOnly()
     {
@@ -34,30 +28,10 @@ public interface MusicCapeHelperConfig extends Config
     }
 
     @ConfigItem(
-        keyName = "groupByArea",
-        name = "Group by area",
-        description = "Group tracks by area instead of showing a flat list",
-        position = 2,
-        section = displaySection
-    )
-    default boolean groupByArea()
-    {
-        return true;
-    }
-
-    @ConfigSection(
-        name = "Click Behaviour",
-        description = "What happens when you click a track",
-        position = 10
-    )
-    String clickSection = "click";
-
-    @ConfigItem(
         keyName = "clickMode",
         name = "Click mode",
         description = "Wiki: open OSRS Wiki page. Map: open in-game world map at the track's location.",
-        position = 11,
-        section = clickSection
+        hidden = true
     )
     default ClickMode clickMode()
     {

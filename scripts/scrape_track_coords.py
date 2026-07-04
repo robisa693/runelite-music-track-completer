@@ -73,6 +73,32 @@ def parse_coord_pair(text):
         return [float(m.group(1)), float(m.group(2))]
     return None
 
+def find_balanced_template_blocks(wikitext, name):
+    """Find the content of all {{name|...}} invocations (case-insensitive
+    template name), correctly handling nested braces such as inner templates
+    ({{mainonly|yes}}) or parameter placeholders ({{{height|300}}}) that a
+    naive "stop at the first }" regex would truncate on.
+    """
+    blocks = []
+    pattern = re.compile(r'\{\{\s*' + re.escape(name) + r'\s*\|', re.IGNORECASE)
+    n = len(wikitext)
+    for m in pattern.finditer(wikitext):
+        start = m.end()
+        depth = 2  # already consumed the opening "{{"
+        i = start
+        while i < n and depth > 0:
+            c = wikitext[i]
+            if c == '{':
+                depth += 1
+            elif c == '}':
+                depth -= 1
+            i += 1
+        end = i - 2 if depth == 0 else i
+        if end < start:
+            end = start
+        blocks.append(wikitext[start:end])
+    return blocks
+
 def parse_inline_map_template(content):
     content = content.strip()
     parts = [p.strip() for p in content.split("|")]
@@ -91,6 +117,8 @@ def parse_inline_map_template(content):
     mtype = params.get("mtype", "")
     group = params.get("group", "")
     bucket = params.get("bucket", "")
+    rect_x = params.get("rectX")
+    rect_y = params.get("rectY")
     return {
         "coords": coords,
         "plane": plane,
@@ -98,19 +126,48 @@ def parse_inline_map_template(content):
         "type": mtype,
         "group": group,
         "bucket": bucket,
+        "rectX": rect_x,
+        "rectY": rect_y,
     }
+
+def expand_shape_coords(im):
+    """Some map features (e.g. mtype=rectangle) are defined by a single
+    centre point plus separate side-length parameters rather than an
+    explicit polygon outline. Expand those into a 4-corner box so callers
+    always get a usable coordinate list. Other single/multi-point feature
+    types (pin, dot, text, media, circle, square, point, etc.) are passed
+    through unchanged.
+    """
+    coords = im["coords"]
+    if im.get("type", "").lower() == "rectangle" and len(coords) == 1 and im.get("rectX") and im.get("rectY"):
+        try:
+            x, y = coords[0]
+            half_x = float(im["rectX"]) / 2
+            half_y = float(im["rectY"]) / 2
+            return [
+                [x - half_x, y - half_y],
+                [x - half_x, y + half_y],
+                [x + half_x, y + half_y],
+                [x + half_x, y - half_y],
+            ]
+        except (ValueError, TypeError):
+            return coords
+    return coords
 
 def extract_inline_maps(wikitext):
     maps = []
-    pattern = r'\{\{Map\|([^}]+)\}\}'
-    for m in re.finditer(pattern, wikitext):
-        parsed = parse_inline_map_template(m.group(1))
-        if len(parsed["coords"]) >= 2:
+    for content in find_balanced_template_blocks(wikitext, "Map"):
+        parsed = parse_inline_map_template(content)
+        # Single-point features (pins, dots, rectangles, circles, etc.) are
+        # valid map data too -- not just multi-point polygons/lines -- so we
+        # only require at least one coordinate.
+        if len(parsed["coords"]) >= 1:
             maps.append(parsed)
     return maps
 
 def extract_infobox_map_ref(wikitext):
-    m = re.search(r'\|\s*map\s*=\s*\{\{Map:([^}]+)\}\}', wikitext)
+    # Template names are case-insensitive on the wiki ({{Map:X}} vs {{map:X}}).
+    m = re.search(r'\|\s*map\s*=\s*\{\{[Mm]ap:([^}]+)\}\}', wikitext)
     if m:
         subpage = "Map:" + m.group(1).strip()
         return subpage
@@ -154,6 +211,37 @@ def resolve_inline_map_name(wikitext):
     if m:
         return m.group(1).strip()
     return None
+
+def build_locations_from_inline_maps(inline_maps, existing_locations):
+    """Turn a list of parsed {{Map|...}} feature dicts into location entries,
+    appending them to (and de-duplicating against) existing_locations.
+    """
+    new_locations = []
+    multi_group_seen = set()
+    for im in inline_maps:
+        coords = expand_shape_coords(im)
+        c = centroid(coords)
+        if not c:
+            continue
+        full_center = c + [im["plane"]]
+
+        if im["group"] and im["group"] not in multi_group_seen:
+            multi_group_seen.add(im["group"])
+            loc_name = f"Region {im['group']}" if im["group"] else "Location"
+        else:
+            loc_name = "Location"
+
+        if im["bucket"]:
+            loc_name = f"{loc_name} ({im['bucket']})"
+
+        all_locations = existing_locations + new_locations
+        if not any(loc["center"] == full_center for loc in all_locations):
+            new_locations.append({
+                "name": loc_name,
+                "center": full_center,
+                "polygon": coords,
+            })
+    return new_locations
 
 def main():
     print("Fetching music track pages...")
@@ -202,43 +290,24 @@ def main():
                             "center": full_center,
                             "polygon": sub_data["polygon"],
                         })
+                    else:
+                        # Some Map: subpages don't use the explicit x=/y=
+                        # "Music track map" format; instead they embed one or
+                        # more raw {{Map|...}} feature templates directly
+                        # (e.g. Map:Rugged Terrain). Fall back to extracting
+                        # those the same way we do for the main page.
+                        sub_inline_maps = extract_inline_maps(sub_wt)
+                        locations.extend(build_locations_from_inline_maps(sub_inline_maps, locations))
 
             inline_maps = extract_inline_maps(wt)
-            current_bucket_regions = {}
-            for im in inline_maps:
-                if im["bucket"] and im["group"]:
-                    key = f"{im['bucket']}_{im['group']}"
-                    if key not in current_bucket_regions:
-                        current_bucket_regions[key] = []
-                    current_bucket_regions[key].append(im)
+            locations.extend(build_locations_from_inline_maps(inline_maps, locations))
 
-            multi_group_seen = set()
-            for im in inline_maps:
-                c = centroid(im["coords"])
-                if not c:
-                    continue
-                full_center = c + [im["plane"]]
-
-                if im["group"] and im["group"] not in multi_group_seen:
-                    multi_group_seen.add(im["group"])
-                    loc_name = f"Region {im['group']}" if im["group"] else "Location"
-                else:
-                    loc_name = "Location"
-
-                if im["bucket"]:
-                    loc_name = f"{loc_name} ({im['bucket']})"
-
-                if not any(loc["center"] == full_center for loc in locations):
-                    locations.append({
-                        "name": loc_name,
-                        "center": full_center,
-                        "polygon": im["coords"],
-                    })
-
-        if locations:
-            output_data[track_name] = locations
-        elif in_missing or extract_infobox_map_ref(wt) is None and not extract_inline_maps(wt):
-            output_data[track_name] = []
+        # Always record an entry for every page we processed -- even when no
+        # locations were found -- so pages are never silently dropped from
+        # the output (this previously happened e.g. for "Rugged Terrain",
+        # which has a map= subpage reference but that subpage's data didn't
+        # match the expected format, so it fell through every branch below).
+        output_data[track_name] = locations
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     with open(OUTPUT_FILE, "w") as f:

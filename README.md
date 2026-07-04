@@ -4,7 +4,7 @@ A RuneLite plugin that helps you complete the music log and unlock the **music c
 
 ## Features
 
-- Side panel listing all music tracks grouped by area
+- Side panel listing all music tracks with their area
 - Track name, unlock status (green = unlocked, red = locked), and unlock hint
 - "Missing only" toggle to show just what you need
 - Search/filter by track name
@@ -37,10 +37,10 @@ The in-game music player already shows locked tracks, but it's tedious to scroll
 
 ## Configuration
 
-- **Show missing only** – Only display locked tracks
-- **Group by area** – Organize tracks by area
-- **Click mode** – Wiki page or in-game map marking
+Day-to-day controls (missing-only filter, Wiki/Map click mode, search, clear marker) live directly in the side panel. The settings page only holds the in-game guidance options:
+
 - **Highlight location in scene** – Ground highlight when near the unlock spot
 - **Show hint arrow** – Minimap arrow when near the unlock spot
 - **Highlight area on world map** – Draw the unlock area as a region on the world map
-- **Highlight color** – Color used for all highlights and markers
+- **Highlight color** – Color used for surface highlights and markers
+- **Underground color** – Color used for the surface-above-a-dungeon markers
