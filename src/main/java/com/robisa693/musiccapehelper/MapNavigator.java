@@ -47,6 +47,7 @@ class MapNavigator
     private final ClientThread clientThread;
     private final WorldMapPointManager worldMapPointManager;
     private final InfoBoxManager infoBoxManager;
+    private final MusicCapeHelperConfig config;
     private final Gson gson;
 
     private Map<String, List<MapLocation>> coordsMap = new HashMap<>();
@@ -67,15 +68,16 @@ class MapNavigator
     private int flashCount;
     private volatile boolean flashOn;
 
-    MapNavigator(Plugin plugin, Client client, ClientThread clientThread, WorldMapPointManager worldMapPointManager, InfoBoxManager infoBoxManager, Gson gson)
+    MapNavigator(Plugin plugin, Client client, ClientThread clientThread, WorldMapPointManager worldMapPointManager, InfoBoxManager infoBoxManager, MusicCapeHelperConfig config, Gson gson)
     {
         this.plugin = plugin;
         this.client = client;
         this.clientThread = clientThread;
         this.worldMapPointManager = worldMapPointManager;
         this.infoBoxManager = infoBoxManager;
+        this.config = config;
         this.gson = gson;
-        this.mapIcon = createMapIcon();
+        this.mapIcon = createMapIcon(new Color(255, 200, 0));
         loadCoordinates();
     }
 
@@ -165,6 +167,7 @@ class MapNavigator
             List<DisplayArea> areas = new ArrayList<>();
             boolean hasSurface = false;
             boolean overheadUsed = false;
+            BufferedImage undergroundMarker = null;
 
             for (ActiveLocation a : parsed)
             {
@@ -172,8 +175,8 @@ class MapNavigator
                 {
                     hasSurface = true;
                     markers.add(a);
-                    addMapPoint(a.point, a.name);
-                    addArea(areas, a.polygon, 0);
+                    addMapPoint(a.point, a.name, mapIcon, null);
+                    addArea(areas, a.polygon, 0, false);
                     continue;
                 }
 
@@ -183,10 +186,16 @@ class MapNavigator
                     if (isSurface(overhead))
                     {
                         overheadUsed = true;
-                        String label = a.name + " (underground - entrance nearby)";
+                        if (undergroundMarker == null)
+                        {
+                            undergroundMarker = createUndergroundMarker(config.undergroundColor());
+                        }
+                        String label = a.name + " (underground - find the entrance near here)";
                         markers.add(new ActiveLocation(label, overhead, null));
-                        addMapPoint(overhead, label);
-                        addArea(areas, a.polygon, -UNDERGROUND_Y);
+                        // Anchor the badge so the dot (not the image center) sits on the spot.
+                        addMapPoint(overhead, label, undergroundMarker,
+                            new net.runelite.api.Point(undergroundMarker.getWidth() / 2, 7));
+                        addArea(areas, a.polygon, -UNDERGROUND_Y, true);
                     }
                 }
             }
@@ -208,8 +217,9 @@ class MapNavigator
             if (!hasSurface && overheadUsed)
             {
                 client.addChatMessage(ChatMessageType.GAMEMESSAGE, "",
-                    "Music Cape: " + trackName + " is underground - the map marks the dungeon area on"
-                        + " the surface above it. Head there and find the entrance.", null);
+                    "Music Cape: " + trackName + " unlocks UNDERGROUND. The red 'UNDERGROUND' marker on"
+                        + " the world map is the surface directly above it - travel there, then look for"
+                        + " the dungeon or cave entrance nearby.", null);
             }
 
             WorldPoint primary = nearestTo(playerLocation(), markers).point;
@@ -236,7 +246,7 @@ class MapNavigator
      * overlay, shifting it by {@code dy} (used to project an underground dungeon
      * outline onto the surface directly above it).
      */
-    private void addArea(List<DisplayArea> areas, List<List<Number>> polygon, int dy)
+    private void addArea(List<DisplayArea> areas, List<List<Number>> polygon, int dy, boolean underground)
     {
         if (polygon == null || polygon.size() < 3)
         {
@@ -254,7 +264,7 @@ class MapNavigator
             xs[i] = vertex.get(0).intValue();
             ys[i] = vertex.get(1).intValue() + dy;
         }
-        areas.add(new DisplayArea(xs, ys));
+        areas.add(new DisplayArea(xs, ys, underground));
     }
 
     /**
@@ -384,11 +394,12 @@ class MapNavigator
         return wp.getY() < UNDERGROUND_Y;
     }
 
-    private void addMapPoint(WorldPoint wp, String name)
+    private void addMapPoint(WorldPoint wp, String name, BufferedImage image, net.runelite.api.Point imagePoint)
     {
         WorldMapPoint point = WorldMapPoint.builder()
             .worldPoint(wp)
-            .image(mapIcon)
+            .image(image)
+            .imagePoint(imagePoint)
             .snapToEdge(true)
             .jumpOnClick(true)
             .name(name)
@@ -423,7 +434,7 @@ class MapNavigator
             @Override
             public String getText()
             {
-                return "F9";
+                return "Map";
             }
 
             @Override
@@ -438,12 +449,12 @@ class MapNavigator
                 return flashOn;
             }
         };
-        openMapInfoBox.setTooltip("Open the world map (F9) to jump to " + name);
+        openMapInfoBox.setTooltip("Open the world map to jump to " + name);
         infoBoxManager.addInfoBox(openMapInfoBox);
         startFlashing();
 
         client.addChatMessage(ChatMessageType.GAMEMESSAGE, "",
-            "Music Cape: press F9 to open the world map and jump to " + name + ".", null);
+            "Music Cape: open the world map (globe icon by the minimap) to jump to " + name + ".", null);
     }
 
     private void removeOpenMapInfoBox()
@@ -501,15 +512,58 @@ class MapNavigator
         clientThread.invoke(this::clearActiveState);
     }
 
-    private static BufferedImage createMapIcon()
+    private static BufferedImage createMapIcon(Color color)
     {
         BufferedImage img = new BufferedImage(14, 14, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = img.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g.setColor(new Color(255, 200, 0));
+        g.setColor(color);
         g.fillOval(1, 1, 12, 12);
         g.setColor(Color.BLACK);
         g.drawOval(1, 1, 12, 12);
+        g.dispose();
+        return img;
+    }
+
+    /**
+     * A marker for the surface spot above an underground track: a colored dot
+     * with an "UNDERGROUND" label baked into the image so it is unmistakable
+     * on the world map.
+     */
+    private static BufferedImage createUndergroundMarker(Color color)
+    {
+        String text = "UNDERGROUND";
+        java.awt.Font font = new java.awt.Font(java.awt.Font.SANS_SERIF, java.awt.Font.BOLD, 10);
+
+        BufferedImage probe = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D pg = probe.createGraphics();
+        pg.setFont(font);
+        int textWidth = pg.getFontMetrics().stringWidth(text);
+        int textHeight = pg.getFontMetrics().getHeight();
+        pg.dispose();
+
+        int width = Math.max(14, textWidth + 4);
+        int height = 14 + textHeight;
+        BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
+        int dotX = width / 2 - 7;
+        g.setColor(color);
+        g.fillOval(dotX + 1, 1, 12, 12);
+        g.setColor(Color.BLACK);
+        g.drawOval(dotX + 1, 1, 12, 12);
+
+        g.setFont(font);
+        int textX = (width - textWidth) / 2;
+        int textY = 14 + g.getFontMetrics().getAscent();
+        // Dark outline behind the label so it stays readable on any map terrain.
+        g.setColor(Color.BLACK);
+        g.drawString(text, textX + 1, textY + 1);
+        g.setColor(color);
+        g.drawString(text, textX, textY);
+
         g.dispose();
         return img;
     }
@@ -543,11 +597,13 @@ class MapNavigator
     {
         final int[] xs;
         final int[] ys;
+        final boolean underground;
 
-        DisplayArea(int[] xs, int[] ys)
+        DisplayArea(int[] xs, int[] ys, boolean underground)
         {
             this.xs = xs;
             this.ys = ys;
+            this.underground = underground;
         }
     }
 }

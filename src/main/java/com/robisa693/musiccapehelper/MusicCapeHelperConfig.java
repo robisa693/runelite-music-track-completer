@@ -118,4 +118,16 @@ public interface MusicCapeHelperConfig extends Config
     {
         return new java.awt.Color(255, 200, 0);
     }
+
+    @ConfigItem(
+        keyName = "undergroundColor",
+        name = "Underground color",
+        description = "Color used when marking the surface above an underground track (dungeon/cave)",
+        position = 25,
+        section = guidanceSection
+    )
+    default java.awt.Color undergroundColor()
+    {
+        return new java.awt.Color(220, 60, 60);
+    }
 }

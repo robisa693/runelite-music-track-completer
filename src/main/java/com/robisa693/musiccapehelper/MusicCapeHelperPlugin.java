@@ -91,7 +91,7 @@ public class MusicCapeHelperPlugin extends Plugin
     {
         config = getConfig(configManager);
         loadUnlockedState();
-        mapNavigator = new MapNavigator(this, client, clientThread, worldMapPointManager, infoBoxManager, gson);
+        mapNavigator = new MapNavigator(this, client, clientThread, worldMapPointManager, infoBoxManager, config, gson);
         sceneOverlay = new MusicSceneOverlay(client, config, mapNavigator);
         mapAreaOverlay = new MusicMapAreaOverlay(client, config, mapNavigator);
         overlayManager.add(sceneOverlay);

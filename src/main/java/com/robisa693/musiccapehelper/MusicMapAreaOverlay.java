@@ -59,9 +59,6 @@ class MusicMapAreaOverlay extends Overlay
         Shape oldClip = graphics.getClip();
         graphics.setClip(bounds);
 
-        Color base = config.highlightColor();
-        Color fill = new Color(base.getRed(), base.getGreen(), base.getBlue(), 50);
-
         for (MapNavigator.DisplayArea area : mapNavigator.getMapAreas())
         {
             Polygon poly = new Polygon();
@@ -71,7 +68,8 @@ class MusicMapAreaOverlay extends Overlay
                 poly.addPoint(p.x, p.y);
             }
 
-            graphics.setColor(fill);
+            Color base = area.underground ? config.undergroundColor() : config.highlightColor();
+            graphics.setColor(new Color(base.getRed(), base.getGreen(), base.getBlue(), 50));
             graphics.fillPolygon(poly);
             graphics.setColor(base);
             graphics.setStroke(new BasicStroke(2f));
