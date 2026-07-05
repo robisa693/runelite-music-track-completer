@@ -53,13 +53,19 @@ class MapNavigator
     private final MusicCapeHelperConfig config;
     private final Gson gson;
 
+    private static final String GIELINOR_SURFACE = "Gielinor Surface";
+
     private Map<String, List<MapLocation>> coordsMap = new HashMap<>();
     private Map<String, ZoneEntrance> entrances = new HashMap<>();
     private Map<String, String> wikiLocations = new HashMap<>();
+    private List<MapArea> areaIndex = Collections.emptyList();
     private final List<WorldMapPoint> activeMapPoints = new ArrayList<>();
     // A centering is owed to the user but no loaded map area could display a
     // marker yet; retried on every WORLDMAP_LOADMAP until one can.
     private boolean pendingCenter;
+    // The map list entry the player should select to see the marker, shown by
+    // the map list highlight overlay while a centering is pending.
+    private volatile String suggestedArea;
     private final BufferedImage mapIcon;
 
     // Active navigation target: written on the client thread, read by overlays
@@ -137,6 +143,67 @@ class MapNavigator
         {
             wikiLocations = new HashMap<>();
         }
+
+        // In-game map areas (the world map's map list entries) with their
+        // coordinate bounds, used to tell the player which entry shows a spot.
+        try (InputStreamReader reader = new InputStreamReader(
+            getClass().getResourceAsStream("/map_areas.json"), StandardCharsets.UTF_8))
+        {
+            Type type = new TypeToken<List<MapArea>>() {}.getType();
+            areaIndex = gson.fromJson(reader, type);
+        }
+        catch (Exception e)
+        {
+            log.debug("No map area data available", e);
+        }
+        if (areaIndex == null)
+        {
+            areaIndex = Collections.emptyList();
+        }
+    }
+
+    /**
+     * Name of the in-game map area (map list entry) that can display the point,
+     * or null when no area covers it. The smallest containing area wins, so a
+     * zone nested inside a larger region (Cam Torum in Varlamore Underground)
+     * is preferred over its parent.
+     */
+    String areaNameFor(WorldPoint wp)
+    {
+        MapArea best = null;
+        long bestSize = Long.MAX_VALUE;
+        for (MapArea area : areaIndex)
+        {
+            if (area.bounds == null || area.bounds.size() < 2
+                || area.bounds.get(0).size() < 2 || area.bounds.get(1).size() < 2)
+            {
+                continue;
+            }
+            long x1 = area.bounds.get(0).get(0).longValue();
+            long y1 = area.bounds.get(0).get(1).longValue();
+            long x2 = area.bounds.get(1).get(0).longValue();
+            long y2 = area.bounds.get(1).get(1).longValue();
+            if (wp.getX() < x1 || wp.getX() > x2 || wp.getY() < y1 || wp.getY() > y2)
+            {
+                continue;
+            }
+            long size = (x2 - x1) * (y2 - y1);
+            if (size < bestSize)
+            {
+                bestSize = size;
+                best = area;
+            }
+        }
+        return best != null ? best.name : null;
+    }
+
+    /**
+     * The map list entry the player should select to see a marker, or null when
+     * no centering is pending (nothing to guide towards).
+     */
+    String getSuggestedAreaName()
+    {
+        return pendingCenter ? suggestedArea : null;
     }
 
     /** "It unlocks at: X." when the wiki knows the place, otherwise "". */
@@ -303,19 +370,30 @@ class MapNavigator
                 return;
             }
 
+            // The in-game map area (map list entry) that can display the exact
+            // unlock spot, when one exists; the entry the player should pick to
+            // see the marker at the actual coordinates.
+            String exactArea = areaNameFor(nearestTo(playerLocation(), parsed).point);
+            suggestedArea = exactArea != null ? exactArea : GIELINOR_SURFACE;
+            String mapListHint = exactArea != null && !exactArea.equals(GIELINOR_SURFACE)
+                ? " You can also open the map list at the bottom of the world map and select '"
+                    + exactArea + "' to see the exact spot."
+                : "";
+
             if (!hasSurface && entranceZone != null)
             {
                 String note = entranceZone.note != null ? " (" + entranceZone.note + ")" : "";
                 client.addChatMessage(ChatMessageType.GAMEMESSAGE, "",
                     "Music Cape: " + trackName + " unlocks inside " + entranceZone.name
-                        + ", UNDERGROUND. The red marker on the world map is the entrance" + note + ".", null);
+                        + ", UNDERGROUND. The red marker on the world map is the entrance" + note + "."
+                        + mapListHint, null);
             }
             else if (!hasSurface && overheadUsed)
             {
                 client.addChatMessage(ChatMessageType.GAMEMESSAGE, "",
                     "Music Cape: " + trackName + " unlocks UNDERGROUND. The red 'UNDERGROUND' marker on"
                         + " the world map is the surface directly above it - travel there, then look for"
-                        + " the dungeon or cave entrance nearby.", null);
+                        + " the dungeon or cave entrance nearby." + mapListHint, null);
             }
 
             if (isWorldMapOpen())
@@ -323,13 +401,14 @@ class MapNavigator
                 // Map is already open: center it now if the loaded map area can display
                 // one of the markers. If it cannot (e.g. the player is underground so the
                 // map shows a dungeon area), stay pending - WORLDMAP_LOADMAP fires when
-                // the user switches map areas and onMapLoaded() retries.
+                // the user switches map areas and onMapLoaded() retries. The map list
+                // button (and the right entry, once opened) is highlighted meanwhile.
                 pendingCenter = !centerOnLoadedMap();
                 if (pendingCenter)
                 {
                     client.addChatMessage(ChatMessageType.GAMEMESSAGE, "",
-                        "Music Cape: switch the world map to Gielinor Surface (dropdown in the"
-                            + " top-left of the map) to see the marker.", null);
+                        "Music Cape: open the map list at the bottom of the world map and select '"
+                            + suggestedArea + "' to see the marker.", null);
                 }
             }
             else
@@ -635,6 +714,7 @@ class MapNavigator
     {
         removeOpenMapInfoBox();
         pendingCenter = false;
+        suggestedArea = null;
         activeTrack = null;
         activeLocations = Collections.emptyList();
         mapAreas = Collections.emptyList();
@@ -717,6 +797,13 @@ class MapNavigator
             this.polygon = polygon;
             this.mapId = mapId;
         }
+    }
+
+    static class MapArea
+    {
+        int id;
+        String name;
+        List<List<Number>> bounds;
     }
 
     static class MapLocation

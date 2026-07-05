@@ -1,0 +1,646 @@
+[
+  {
+    "id": 0,
+    "name": "Gielinor Surface",
+    "bounds": [
+      [
+        1052,
+        2396
+      ],
+      [
+        3940,
+        4132
+      ]
+    ]
+  },
+  {
+    "id": 1,
+    "name": "Ancient Cavern",
+    "bounds": [
+      [
+        1628,
+        5212
+      ],
+      [
+        1892,
+        5476
+      ]
+    ]
+  },
+  {
+    "id": 2,
+    "name": "Ardougne Underground",
+    "bounds": [
+      [
+        2396,
+        9500
+      ],
+      [
+        2788,
+        9892
+      ]
+    ]
+  },
+  {
+    "id": 3,
+    "name": "Asgarnia Ice Cave",
+    "bounds": [
+      [
+        2780,
+        9436
+      ],
+      [
+        3236,
+        9700
+      ]
+    ]
+  },
+  {
+    "id": 4,
+    "name": "Braindeath Island",
+    "bounds": [
+      [
+        2012,
+        4956
+      ],
+      [
+        2212,
+        5220
+      ]
+    ]
+  },
+  {
+    "id": 5,
+    "name": "Dorgesh-Kaan",
+    "bounds": [
+      [
+        2588,
+        5148
+      ],
+      [
+        2916,
+        5540
+      ]
+    ]
+  },
+  {
+    "id": 6,
+    "name": "Dwarven Mines",
+    "bounds": [
+      [
+        2844,
+        9564
+      ],
+      [
+        3300,
+        9892
+      ]
+    ]
+  },
+  {
+    "id": 7,
+    "name": "God Wars Dungeon",
+    "bounds": [
+      [
+        2716,
+        5084
+      ],
+      [
+        3044,
+        5412
+      ]
+    ]
+  },
+  {
+    "id": 8,
+    "name": "Ghorrock Prison",
+    "bounds": [
+      [
+        2839,
+        6295
+      ],
+      [
+        3031,
+        6487
+      ]
+    ]
+  },
+  {
+    "id": 9,
+    "name": "Karamja Underground",
+    "bounds": [
+      [
+        2460,
+        9244
+      ],
+      [
+        2980,
+        9700
+      ]
+    ]
+  },
+  {
+    "id": 10,
+    "name": "Keldagrim",
+    "bounds": [
+      [
+        2716,
+        9948
+      ],
+      [
+        2980,
+        10276
+      ]
+    ]
+  },
+  {
+    "id": 11,
+    "name": "Miscellania Underground",
+    "bounds": [
+      [
+        2012,
+        10076
+      ],
+      [
+        2916,
+        10468
+      ]
+    ]
+  },
+  {
+    "id": 12,
+    "name": "Misthalin Underground",
+    "bounds": [
+      [
+        2972,
+        9372
+      ],
+      [
+        3364,
+        10084
+      ]
+    ]
+  },
+  {
+    "id": 13,
+    "name": "Mole Hole",
+    "bounds": [
+      [
+        1628,
+        5020
+      ],
+      [
+        1828,
+        5284
+      ]
+    ]
+  },
+  {
+    "id": 14,
+    "name": "Morytania Underground",
+    "bounds": [
+      [
+        3292,
+        9500
+      ],
+      [
+        3748,
+        10020
+      ]
+    ]
+  },
+  {
+    "id": 15,
+    "name": "Mos Le'Harmless Cave",
+    "bounds": [
+      [
+        3612,
+        9244
+      ],
+      [
+        3876,
+        9508
+      ]
+    ]
+  },
+  {
+    "id": 16,
+    "name": "Ourania Altar",
+    "bounds": [
+      [
+        2908,
+        5468
+      ],
+      [
+        3108,
+        5668
+      ]
+    ]
+  },
+  {
+    "id": 17,
+    "name": "Fremennik Slayer Cave",
+    "bounds": [
+      [
+        2588,
+        9820
+      ],
+      [
+        2852,
+        10084
+      ]
+    ]
+  },
+  {
+    "id": 18,
+    "name": "Stronghold of Security",
+    "bounds": [
+      [
+        1756,
+        4764
+      ],
+      [
+        2084,
+        5284
+      ]
+    ]
+  },
+  {
+    "id": 19,
+    "name": "Stronghold Underground",
+    "bounds": [
+      [
+        2140,
+        9628
+      ],
+      [
+        2596,
+        10084
+      ]
+    ]
+  },
+  {
+    "id": 20,
+    "name": "Taverley Underground",
+    "bounds": [
+      [
+        2524,
+        9500
+      ],
+      [
+        3044,
+        10084
+      ]
+    ]
+  },
+  {
+    "id": 21,
+    "name": "Tolna's Rift",
+    "bounds": [
+      [
+        3164,
+        9692
+      ],
+      [
+        3364,
+        9892
+      ]
+    ]
+  },
+  {
+    "id": 22,
+    "name": "Troll Stronghold",
+    "bounds": [
+      [
+        2716,
+        9948
+      ],
+      [
+        3044,
+        10212
+      ]
+    ]
+  },
+  {
+    "id": 23,
+    "name": "Mor Ul Rek",
+    "bounds": [
+      [
+        2268,
+        4892
+      ],
+      [
+        2596,
+        5220
+      ]
+    ]
+  },
+  {
+    "id": 24,
+    "name": "Lair of Tarn Razorlor",
+    "bounds": [
+      [
+        3036,
+        4444
+      ],
+      [
+        3428,
+        4708
+      ]
+    ]
+  },
+  {
+    "id": 25,
+    "name": "Waterbirth Dungeon",
+    "bounds": [
+      [
+        2332,
+        9500
+      ],
+      [
+        2788,
+        10212
+      ]
+    ]
+  },
+  {
+    "id": 26,
+    "name": "Wilderness Dungeons",
+    "bounds": [
+      [
+        2780,
+        9948
+      ],
+      [
+        3428,
+        10468
+      ]
+    ]
+  },
+  {
+    "id": 27,
+    "name": "Yanille Underground",
+    "bounds": [
+      [
+        2204,
+        9308
+      ],
+      [
+        2724,
+        9572
+      ]
+    ]
+  },
+  {
+    "id": 28,
+    "name": "Zanaris",
+    "bounds": [
+      [
+        2268,
+        4252
+      ],
+      [
+        2532,
+        4516
+      ]
+    ]
+  },
+  {
+    "id": 29,
+    "name": "Prifddinas",
+    "bounds": [
+      [
+        3136,
+        5952
+      ],
+      [
+        3392,
+        6208
+      ]
+    ]
+  },
+  {
+    "id": 30,
+    "name": "Fossil Island Underground",
+    "bounds": [
+      [
+        3484,
+        10012
+      ],
+      [
+        4004,
+        10340
+      ]
+    ]
+  },
+  {
+    "id": 31,
+    "name": "Feldip Hills Underground",
+    "bounds": [
+      [
+        1756,
+        8860
+      ],
+      [
+        2148,
+        9188
+      ]
+    ]
+  },
+  {
+    "id": 32,
+    "name": "Kourend Underground",
+    "bounds": [
+      [
+        1244,
+        9692
+      ],
+      [
+        1956,
+        10212
+      ]
+    ]
+  },
+  {
+    "id": 33,
+    "name": "Kebos Underground",
+    "bounds": [
+      [
+        988,
+        9756
+      ],
+      [
+        1444,
+        10340
+      ]
+    ]
+  },
+  {
+    "id": 34,
+    "name": "Prifddinas Underground",
+    "bounds": [
+      [
+        3136,
+        12352
+      ],
+      [
+        3392,
+        12608
+      ]
+    ]
+  },
+  {
+    "id": 35,
+    "name": "Prifddinas Grand Library",
+    "bounds": [
+      [
+        2495,
+        6015
+      ],
+      [
+        2751,
+        6271
+      ]
+    ]
+  },
+  {
+    "id": 36,
+    "name": "LMS Desert Island",
+    "bounds": [
+      [
+        3264,
+        5632
+      ],
+      [
+        3648,
+        6016
+      ]
+    ]
+  },
+  {
+    "id": 37,
+    "name": "Tutorial Island",
+    "bounds": [
+      [
+        1567,
+        5983
+      ],
+      [
+        1823,
+        6239
+      ]
+    ]
+  },
+  {
+    "id": 38,
+    "name": "LMS Wild Varrock",
+    "bounds": [
+      [
+        3392,
+        5952
+      ],
+      [
+        3712,
+        6288
+      ]
+    ]
+  },
+  {
+    "id": 39,
+    "name": "Ruins of Camdozaal",
+    "bounds": [
+      [
+        2880,
+        5696
+      ],
+      [
+        3032,
+        5832
+      ]
+    ]
+  },
+  {
+    "id": 40,
+    "name": "The Abyss",
+    "bounds": [
+      [
+        2944,
+        4736
+      ],
+      [
+        3136,
+        4928
+      ]
+    ]
+  },
+  {
+    "id": 41,
+    "name": "Lassar Undercity",
+    "bounds": [
+      [
+        2560,
+        6272
+      ],
+      [
+        2752,
+        6464
+      ]
+    ]
+  },
+  {
+    "id": 42,
+    "name": "Kharidian Desert Underground",
+    "bounds": [
+      [
+        3036,
+        9216
+      ],
+      [
+        3712,
+        9792
+      ]
+    ]
+  },
+  {
+    "id": 43,
+    "name": "Varlamore Underground",
+    "bounds": [
+      [
+        1152,
+        9280
+      ],
+      [
+        1920,
+        9728
+      ]
+    ]
+  },
+  {
+    "id": 44,
+    "name": "Cam Torum",
+    "bounds": [
+      [
+        1344,
+        9472
+      ],
+      [
+        1536,
+        9664
+      ]
+    ]
+  },
+  {
+    "id": 45,
+    "name": "Neypotzli",
+    "bounds": [
+      [
+        1344,
+        9568
+      ],
+      [
+        1536,
+        9728
+      ]
+    ]
+  }
+]
