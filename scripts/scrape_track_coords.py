@@ -198,13 +198,20 @@ def extract_inline_maps(wikitext):
             maps.append(parsed)
     return maps
 
-def extract_infobox_map_ref(wikitext):
-    # Template names are case-insensitive on the wiki ({{Map:X}} vs {{map:X}}).
-    m = re.search(r'\|\s*map\s*=\s*\{\{[Mm]ap:([^}]+)\}\}', wikitext)
-    if m:
-        subpage = "Map:" + m.group(1).strip()
-        return subpage
-    return None
+def extract_map_template_refs(wikitext):
+    """All Map: template pages the page invokes, e.g. {{Map:Wilderness music
+    |height=150}} or {{Map:Brimhaven Dungeon}} - anywhere on the page, not
+    just the infobox map= param, and with the name cut before any template
+    parameters (the old regex swallowed |height=... into the page title, so
+    the fetch failed silently and the track lost its current locations).
+    Template names are case-insensitive on the wiki ({{Map:X}} vs {{map:X}}).
+    """
+    refs = []
+    for m in re.finditer(r'\{\{[Mm]ap:([^}|\n#]+)', wikitext):
+        name = m.group(1).strip()
+        if name and ("Map:" + name) not in refs:
+            refs.append("Map:" + name)
+    return refs
 
 def parse_subpage_data(wikitext):
     x_m = re.search(r'\|\s*x\s*=\s*([\d.]+)', wikitext)
@@ -299,22 +306,28 @@ def build_locations_from_inline_maps(inline_maps, existing_locations):
     return new_locations
 
 def main():
-    print("Fetching music track pages...")
-    all_pages = get_category_members("Category:Music_tracks")
-    print(f"  Found {len(all_pages)} pages total")
+    # Page titles as arguments re-scrape just those pages and merge them into
+    # the existing output - handy for fixing a single track without a ~10 min
+    # full run: python3 scrape_track_coords.py "7th Realm"
+    targets = [a.strip() for a in sys.argv[1:] if a.strip()]
+    if targets:
+        all_pages = targets
+        print(f"Re-scraping {len(all_pages)} page(s), merging into existing output")
+    else:
+        print("Fetching music track pages...")
+        all_pages = get_category_members("Category:Music_tracks")
+        print(f"  Found {len(all_pages)} pages total")
 
     print("Fetching missing-track-location pages...")
     missing_pages = set(get_category_members(MISSING_CATEGORY))
     print(f"  {len(missing_pages)} pages have no location data")
 
     output_data = {}
-
-    skipped_pages = {"7th Realm"}
+    if targets and os.path.exists(OUTPUT_FILE):
+        with open(OUTPUT_FILE) as f:
+            output_data = json.load(f)
 
     for i, page in enumerate(all_pages):
-        if page in skipped_pages:
-            continue
-
         if (i + 1) % 50 == 0:
             print(f"  Processing page {i + 1}/{len(all_pages)}...")
 
@@ -332,30 +345,33 @@ def main():
         in_missing = page in missing_pages
 
         if not in_missing:
-            subpage = extract_infobox_map_ref(wt)
-            if subpage:
+            for subpage in extract_map_template_refs(wt):
                 sub_wt = get_wikitext(subpage)
-                if sub_wt:
-                    sub_data = parse_subpage_data(sub_wt)
-                    if sub_data:
-                        loc_name = resolve_inline_map_name(sub_wt) or subpage.replace("Map:", "").replace(" music", "").strip()
-                        full_center = sub_data["center"] + [sub_data["plane"]]
-                        entry = {
-                            "name": loc_name,
-                            "center": full_center,
-                            "polygon": sub_data["polygon"],
-                        }
-                        if sub_data.get("mapId") is not None:
-                            entry["mapId"] = sub_data["mapId"]
+                if not sub_wt:
+                    continue
+                sub_data = parse_subpage_data(sub_wt)
+                if sub_data:
+                    loc_name = resolve_inline_map_name(sub_wt) or subpage.replace(" music", "").strip()
+                    if loc_name.startswith("Map:"):
+                        loc_name = loc_name[len("Map:"):].strip()
+                    full_center = sub_data["center"] + [sub_data["plane"]]
+                    entry = {
+                        "name": loc_name,
+                        "center": full_center,
+                        "polygon": sub_data["polygon"],
+                    }
+                    if sub_data.get("mapId") is not None:
+                        entry["mapId"] = sub_data["mapId"]
+                    if not any(loc["center"] == full_center for loc in locations):
                         locations.append(entry)
-                    else:
-                        # Some Map: subpages don't use the explicit x=/y=
-                        # "Music track map" format; instead they embed one or
-                        # more raw {{Map|...}} feature templates directly
-                        # (e.g. Map:Rugged Terrain). Fall back to extracting
-                        # those the same way we do for the main page.
-                        sub_inline_maps = extract_inline_maps(sub_wt)
-                        locations.extend(build_locations_from_inline_maps(sub_inline_maps, locations))
+                else:
+                    # Some Map: subpages don't use the explicit x=/y=
+                    # "Music track map" format; instead they embed one or
+                    # more raw {{Map|...}} feature templates directly
+                    # (e.g. Map:Rugged Terrain). Fall back to extracting
+                    # those the same way we do for the main page.
+                    sub_inline_maps = extract_inline_maps(sub_wt)
+                    locations.extend(build_locations_from_inline_maps(sub_inline_maps, locations))
 
             inline_maps = extract_inline_maps(wt)
             locations.extend(build_locations_from_inline_maps(inline_maps, locations))

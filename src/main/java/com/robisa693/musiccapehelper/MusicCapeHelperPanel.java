@@ -389,9 +389,9 @@ class MusicCapeHelperPanel extends PluginPanel
     private void resolveAndBrowse(String trackName)
     {
         String plainUrl = wikiUrlForTrack(trackName);
-        String apiEncoded = URLEncoder.encode(trackName, StandardCharsets.UTF_8);
+        String apiEncoded = URLEncoder.encode(trackName + " (music track)", StandardCharsets.UTF_8);
         String apiUrl = "https://oldschool.runescape.wiki/api.php?action=query&titles="
-            + apiEncoded + "_(music_track)&format=json&redirects=1";
+            + apiEncoded + "&format=json&formatversion=2&redirects=1";
 
         Request request = new Request.Builder()
             .url(apiUrl)
@@ -409,18 +409,32 @@ class MusicCapeHelperPanel extends PluginPanel
             @Override
             public void onResponse(Call call, Response response) throws IOException
             {
+                // Only use the "<name> (music track)" page when the API
+                // positively confirms it exists; on any error, rate-limit
+                // page or unexpected payload, the plain title is the safe
+                // choice (most track pages live there anyway).
+                boolean suffixedExists = false;
                 try (ResponseBody body = response.body())
                 {
-                    String json = body.string();
-                    if (!json.contains("\"missing\""))
+                    if (response.isSuccessful())
                     {
-                        browseUrl(plainUrl + "_(music_track)");
-                    }
-                    else
-                    {
-                        browseUrl(plainUrl);
+                        com.google.gson.JsonObject root = new com.google.gson.JsonParser()
+                            .parse(body.string()).getAsJsonObject();
+                        com.google.gson.JsonArray pages = root
+                            .getAsJsonObject("query").getAsJsonArray("pages");
+                        if (pages != null && pages.size() > 0)
+                        {
+                            com.google.gson.JsonObject pageObj = pages.get(0).getAsJsonObject();
+                            suffixedExists = !pageObj.has("missing")
+                                && !pageObj.has("invalid");
+                        }
                     }
                 }
+                catch (Exception ex)
+                {
+                    suffixedExists = false;
+                }
+                browseUrl(suffixedExists ? plainUrl + "_(music_track)" : plainUrl);
             }
         });
     }
