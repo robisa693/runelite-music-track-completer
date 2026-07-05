@@ -422,14 +422,6 @@
     ],
     "note": "H.A.M. hideout trapdoor, west of Lumbridge"
   },
-  "10075": {
-    "name": "Hallowed Sepulchre - Level 1",
-    "entrance": [
-      3612,
-      3362
-    ],
-    "note": "Hallowed Sepulchre, entered in Darkmeyer"
-  },
   "10076": {
     "name": "Hallowed Sepulchre starting area",
     "entrance": [
@@ -450,11 +442,6 @@
       2897
     ],
     "note": "Jaldraocht Pyramid, western desert (Desert Treasure)"
-  },
-  "10087": {
-    "name": "Keep Le Faye (instance)",
-    "entrance": null,
-    "note": "Quest instance (King's Ransom)"
   },
   "10088": {
     "name": "Keldagrim Rat Pits",
@@ -651,11 +638,6 @@
     "entrance": null,
     "note": "Quest area"
   },
-  "10151": {
-    "name": "The Grand Tree - Monkey Madness II",
-    "entrance": null,
-    "note": "Quest instance (Monkey Madness II)"
-  },
   "10153": {
     "name": "Train station",
     "entrance": [
@@ -708,11 +690,6 @@
       2943
     ],
     "note": "Viyeldi caves, Kharazi Jungle (Legends' Quest)"
-  },
-  "10178": {
-    "name": "Wilderness Wars",
-    "entrance": null,
-    "note": "Wilderness minigame area"
   },
   "10179": {
     "name": "Witchaven Dungeon",

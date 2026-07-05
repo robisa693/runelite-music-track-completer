@@ -51,7 +51,7 @@ USER_AGENT = "music-cape-helper data generator"
 # extents are unknown.
 CURATED_BOUNDS = {
     8: [[2839, 6295], [3031, 6487]],    # Ghorrock Prison (id reused, see below)
-    21: [[3008, 5184], [3200, 5376]],   # Tolna's Rift (moved to the mid-band since the snapshot)
+    21: [[3048, 5224], [3160, 5336]],   # Tolna's Rift (moved to the mid-band; box kept off the Tunnel of Chaos pocket at (3168,5216))
     29: [[3008, 5952], [3392, 6208]],   # Prifddinas (extends west over the Zalcano/Gauntlet pockets, verified in-game)
     34: [[3136, 12352], [3392, 12608]], # Prifddinas Underground
     35: [[2495, 6015], [2751, 6271]],   # Prifddinas Grand Library
@@ -126,6 +126,11 @@ def main():
 
     areas = []
     seen = set()
+    # Ids with their own snapshot entry can't be another area's new identity.
+    snapshot_ids = {
+        m.get("mapId") for m in basemaps
+        if m.get("mapId") is not None and 0 <= m.get("mapId") < 10000 and m.get("bounds")
+    }
     for m in basemaps:
         map_id = m.get("mapId")
         bounds = m.get("bounds")
@@ -133,16 +138,38 @@ def main():
         if map_id is None or map_id < 0 or map_id >= 10000 or not bounds \
                 or map_id in SKIP_STALE_IDS:
             continue
+        tile_id = map_id  # tiles are stored under the snapshot's id
+        name = names.get(map_id)
+        if name is None:
+            # The area fell out of the current in-game map list since the
+            # snapshot. If exactly one current area's center sits inside its
+            # bounds, the area was renamed/regrouped (Karamja Underground ->
+            # Ardent Ocean Underground in the ocean reorg): adopt the current
+            # id and name, keeping the probed squares. Otherwise drop it -
+            # suggesting a map list entry that no longer exists guides nowhere.
+            adopted = [
+                i for i, (cx, cy) in centers.items()
+                if 1 <= i < 10000 and i not in snapshot_ids
+                and bounds[0][0] <= cx <= bounds[1][0] and bounds[0][1] <= cy <= bounds[1][1]
+            ]
+            if len(adopted) == 1:
+                map_id = adopted[0]
+                name = names[map_id]
+                print(f"  renamed stale area {m.get('mapId')} ({m.get('name')}) -> {map_id} ({name})")
+            else:
+                print(f"  dropped stale area {m.get('mapId')} ({m.get('name')}): "
+                      f"{len(adopted)} current centers inside")
+                continue
         seen.add(map_id)
         area = {
             "id": map_id,
-            "name": names.get(map_id, m.get("name", f"Area {map_id}")),
+            "name": name,
             "bounds": bounds,
         }
         # The surface needs no square list: the plugin classifies y < 4160 as
         # surface directly, and probing its ~2700 squares would be wasteful.
         if map_id != 0 and version:
-            area["squares"] = probe_squares(map_id, version, bounds)
+            area["squares"] = probe_squares(tile_id, version, bounds)
             print(f"{map_id:3d} {area['name']}: {len(area['squares'])} squares")
         areas.append(area)
 

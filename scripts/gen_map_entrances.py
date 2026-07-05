@@ -288,7 +288,22 @@ def main():
                     else:
                         l.pop("mapId", None)
                 elif current is None:
-                    replacement = containing_map(bounds, c[0], c[1])
+                    # A table center within 160 tiles is effectively
+                    # membership - pockets are 128-256 tiles wide, and the
+                    # centers are precise where the bounds boxes are padded
+                    # (Dorgesh-Kaan's box swallows the Killerwatt pocket).
+                    # The misassignments this scheme replaced (Inferno ->
+                    # Mouse hole and friends) were all 190+ tiles out.
+                    best, best_d = None, None
+                    for mi, (tx, ty) in table_centers.items():
+                        if mi < 1:
+                            continue
+                        d = ((c[0] - tx) ** 2 + (c[1] - ty) ** 2) ** 0.5
+                        if best_d is None or d < best_d:
+                            best, best_d = mi, d
+                    replacement = best if best is not None and best_d <= 160 else None
+                    if replacement is None:
+                        replacement = containing_map(bounds, c[0], c[1])
                     if replacement is not None:
                         l["mapId"] = replacement
             if "mapId" in l:
