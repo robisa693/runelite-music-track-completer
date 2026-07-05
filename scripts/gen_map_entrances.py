@@ -345,6 +345,10 @@ def main():
     for track, locs in data.items():
         place = (wiki_places.get(track) or "").strip()
         if place not in PLACE_ENTRANCES:
+            # Tracks named after their place ("Temple of the Eye") sometimes
+            # lack a recorded unlock place; the name itself is the match.
+            place = track if track in PLACE_ENTRANCES else place
+        if place not in PLACE_ENTRANCES:
             continue
         if place not in place_ids:
             place_ids[place] = PLACE_ENTRANCE_BASE_ID + len(place_ids) + 1
