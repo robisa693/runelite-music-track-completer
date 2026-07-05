@@ -111,11 +111,6 @@
     ],
     "note": "Last Man Standing lobby, Ferox Enclave"
   },
-  "37": {
-    "name": "Tutorial Island",
-    "entrance": null,
-    "note": "Tutorial Island"
-  },
   "38": {
     "name": "LMS Wild Varrock",
     "entrance": [
@@ -427,14 +422,6 @@
     ],
     "note": "H.A.M. hideout trapdoor, west of Lumbridge"
   },
-  "10075": {
-    "name": "Hallowed Sepulchre - Level 1",
-    "entrance": [
-      3612,
-      3362
-    ],
-    "note": "Hallowed Sepulchre, entered in Darkmeyer"
-  },
   "10076": {
     "name": "Hallowed Sepulchre starting area",
     "entrance": [
@@ -455,11 +442,6 @@
       2897
     ],
     "note": "Jaldraocht Pyramid, western desert (Desert Treasure)"
-  },
-  "10087": {
-    "name": "Keep Le Faye (instance)",
-    "entrance": null,
-    "note": "Quest instance (King's Ransom)"
   },
   "10088": {
     "name": "Keldagrim Rat Pits",
@@ -656,11 +638,6 @@
     "entrance": null,
     "note": "Quest area"
   },
-  "10151": {
-    "name": "The Grand Tree - Monkey Madness II",
-    "entrance": null,
-    "note": "Quest instance (Monkey Madness II)"
-  },
   "10153": {
     "name": "Train station",
     "entrance": [
@@ -673,14 +650,6 @@
     "name": "Tunnel of Chaos",
     "entrance": null,
     "note": "Tunnel of Chaos, east of Varrock (What Lies Below)"
-  },
-  "10162": {
-    "name": "Underground Pass - bottom level (Song of the Elves instance)",
-    "entrance": [
-      2434,
-      3315
-    ],
-    "note": "Underground Pass entrance, west of West Ardougne"
   },
   "10164": {
     "name": "Underground Pass - Iban's Temple (post-quest)",
@@ -722,11 +691,6 @@
     ],
     "note": "Viyeldi caves, Kharazi Jungle (Legends' Quest)"
   },
-  "10178": {
-    "name": "Wilderness Wars",
-    "entrance": null,
-    "note": "Wilderness minigame area"
-  },
   "10179": {
     "name": "Witchaven Dungeon",
     "entrance": [
@@ -742,5 +706,13 @@
       2847
     ],
     "note": "Wrath altar, basement of the Myths' Guild"
+  },
+  "90001": {
+    "name": "Temple of the Eye",
+    "entrance": [
+      3104,
+      3162
+    ],
+    "note": "Portal in the basement of the Wizards' Tower"
   }
 }

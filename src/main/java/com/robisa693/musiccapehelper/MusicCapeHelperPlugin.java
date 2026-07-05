@@ -81,6 +81,7 @@ public class MusicCapeHelperPlugin extends Plugin
     private MapNavigator mapNavigator;
     private MusicSceneOverlay sceneOverlay;
     private MusicMapAreaOverlay mapAreaOverlay;
+    private MusicMapListHighlightOverlay mapListHighlightOverlay;
     private NavigationButton navButton;
     private Map<Integer, Boolean> unlockedState = new HashMap<>();
 
@@ -94,8 +95,10 @@ public class MusicCapeHelperPlugin extends Plugin
         mapNavigator = new MapNavigator(this, client, clientThread, worldMapPointManager, infoBoxManager, config, gson);
         sceneOverlay = new MusicSceneOverlay(client, config, mapNavigator);
         mapAreaOverlay = new MusicMapAreaOverlay(client, config, mapNavigator);
+        mapListHighlightOverlay = new MusicMapListHighlightOverlay(client, config, mapNavigator);
         overlayManager.add(sceneOverlay);
         overlayManager.add(mapAreaOverlay);
+        overlayManager.add(mapListHighlightOverlay);
         panel = new MusicCapeHelperPanel(this, config, configManager, okHttpClient, client, clientThread, mapNavigator);
         navButton = NavigationButton.builder()
             .tooltip("Music Cape Helper")
@@ -118,6 +121,10 @@ public class MusicCapeHelperPlugin extends Plugin
         if (mapAreaOverlay != null)
         {
             overlayManager.remove(mapAreaOverlay);
+        }
+        if (mapListHighlightOverlay != null)
+        {
+            overlayManager.remove(mapListHighlightOverlay);
         }
         if (mapNavigator != null)
         {

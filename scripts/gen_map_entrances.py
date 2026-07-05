@@ -143,41 +143,225 @@ ENTRANCES = {
 }
 
 
+# Curated: tracks whose pocket has no map of its own on the wiki, so no
+# containing map exists to assign. Maps track name -> mapId, or None for
+# instanced areas with no map at all (the plugin falls back to the wiki).
+MAPID_OVERRIDES = {
+    "Inferno": 23,           # unlocks entering Mor Ul Rek (wiki: Mor Ul Rek)
+    "Darkly Altared": None,  # Skotizo's chamber
+    "Monkey Sadness": None,  # Glough's laboratory (MM2 instance)
+    # Zalcano's pocket isn't rendered by the in-game Prifddinas area, so the
+    # center-distance assignment can't attach it; the Prif entrance is still
+    # the right guidance.
+    "The Spurned Demon": 29,
+}
+
+# Instanced areas with no map anywhere (not even a wiki one): unlock place ->
+# (surface entrance, note). Emitted under synthetic ids (90000+) so the plugin
+# can guide to the entrance instead of projecting instance coordinates onto
+# meaningless ground (Guardians of the Rift would project into empty desert).
+PLACE_ENTRANCES = {
+    "Temple of the Eye": ([3104, 3162], "Portal in the basement of the Wizards' Tower"),
+}
+PLACE_ENTRANCE_BASE_ID = 90000
+
+BASEMAPS_URL = "https://maps.runescape.wiki/osrs/data/basemaps.json"
+MAP_AREAS = os.path.join(SCRIPT_DIR, "..", "src", "main", "resources", "map_areas.json")
+
+
+def load_bounds():
+    """Coordinate bounds per mapId: wiki maps from the map engine config,
+    in-game areas from map_areas.json (which carries curated boxes for areas
+    the engine snapshot predates)."""
+    import urllib.request
+    req = urllib.request.Request(
+        BASEMAPS_URL, headers={"User-Agent": "music-cape-helper data generator"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        basemaps = json.load(r)
+    bounds = {}
+    for m in basemaps:
+        if m.get("mapId") is not None and m.get("mapId") >= 0 and m.get("bounds"):
+            bounds[m["mapId"]] = m["bounds"]
+    with open(MAP_AREAS) as f:
+        for a in json.load(f):
+            bounds[a["id"]] = a["bounds"]
+    return bounds
+
+
+def containing_map(bounds, x, y):
+    """The smallest map (id) whose bounds contain the point, excluding the
+    surface (0), or None."""
+    best, best_size = None, None
+    for map_id, b in bounds.items():
+        if map_id == 0:
+            continue
+        if not (b[0][0] <= x <= b[1][0] and b[0][1] <= y <= b[1][1]):
+            continue
+        size = (b[1][0] - b[0][0]) * (b[1][1] - b[0][1])
+        if best_size is None or size < best_size:
+            best, best_size = map_id, size
+    return best
+
+
+WIKI_LOCATIONS = os.path.join(SCRIPT_DIR, "..", "src", "main", "resources", "wiki_locations.json")
+
+
+def apply_unlock_place_maps(data, names, table_centers):
+    """Relocate tracks whose wiki unlock place names a different map than the
+    scraped feature does. Some track pages carry a map embed for an unrelated
+    area (Beetle Juice's marker sat in the Fairy Resistance Hideout pocket
+    while its unlock place says Sophanem Dungeon, whose map is at the real
+    dungeon-band coordinates), so when the unlock place exactly matches a map
+    name in the table and none of the track's locations are anywhere near
+    that map, the locations are replaced by the named map's center."""
+    try:
+        with open(WIKI_LOCATIONS) as f:
+            wiki_locations = json.load(f)
+    except OSError:
+        return
+    by_name = {n.strip().lower(): i for i, n in names.items()}
+    for track, locs in data.items():
+        place = (wiki_locations.get(track) or "").strip().lower()
+        target = by_name.get(place)
+        if target is None or target < 0 or not locs:
+            continue
+        tx, ty = table_centers[target]
+        near = any(
+            ((l["center"][0] - tx) ** 2 + (l["center"][1] - ty) ** 2) ** 0.5 <= 384
+            for l in locs if l.get("center") and len(l["center"]) >= 2)
+        if near:
+            continue
+        # Only replace mid-band pocket features - surface and dungeon-band
+        # coordinates are real places and stay authoritative.
+        if not all(4160 <= l["center"][1] < 6400 for l in locs if l.get("center")):
+            continue
+        print(f"  relocated {track}: unlock place is map {target} ({names[target]}) at ({tx},{ty})")
+        entry = {"name": "Location (yes)", "center": [float(tx), float(ty), 0], "polygon": None}
+        if 4160 <= ty < 6400:
+            entry["mapId"] = target
+        data[track] = [entry]
+
+
 def main():
     wt = get_wikitext(MAPIDS_PAGE)
     if not wt:
         raise SystemExit(f"could not fetch {MAPIDS_PAGE} from the wiki")
     rows = re.findall(r'\|\s*(-?\d+)\s*\|\|\s*([^|]+?)\s*\|\|\s*\((\d+),\s*(\d+)\)', wt)
     maps = [(int(i), n.strip(), int(x), int(y)) for i, n, x, y in rows]
-    mid = [m for m in maps if 4160 <= m[3] < 6400 and m[0] >= 1]
     names = {m[0]: m[1] for m in maps}
+    table_centers = {m[0]: (m[2], m[3]) for m in maps}
+    bounds = load_bounds()
 
     with open(COORDS) as f:
         data = json.load(f)
 
+    apply_unlock_place_maps(data, names, table_centers)
+
     used = {}
     assigned = 0
     unassigned = []
+    dropped = []
     for track, locs in data.items():
         for l in locs:
             c = l.get("center")
             if not c or len(c) < 3 or not (4160 <= c[1] < 6400):
                 continue
-            if "mapId" not in l:
-                best, bd = None, float("inf")
-                for mi, mn, mx, my in mid:
-                    dist = (c[0] - mx) ** 2 + (c[1] - my) ** 2
-                    if dist < bd:
-                        bd, best = dist, mi
-                if bd ** 0.5 <= 512:
-                    l["mapId"] = best
+            if track in MAPID_OVERRIDES:
+                override = MAPID_OVERRIDES[track]
+                if override is None:
+                    l.pop("mapId", None)
+                else:
+                    l["mapId"] = override
+            else:
+                # A mapId (scraped or previously assigned) must actually
+                # belong to the location - proximity guessing produced wrong
+                # entrance notes (Beneath Cursed Sands got Tunnel of Chaos).
+                # Validate by bounds containment where bounds are known, else
+                # by distance to the map's table center (pocket maps are
+                # small, so a center more than 384 tiles away is provably a
+                # different map). Invalid ids are reassigned to the map whose
+                # bounds contain the location, or dropped for a clean wiki
+                # fallback - never reassigned by proximity.
+                current = l.get("mapId")
+                valid = None
+                if current is not None:
+                    if current >= PLACE_ENTRANCE_BASE_ID:
+                        # Synthetic place-entrance id from a previous run;
+                        # reapplied below, nothing to validate against.
+                        valid = True
+                    else:
+                        # A map can live in two coordinate spaces: its wiki
+                        # pocket (near the table center) and its in-game area
+                        # (the bounds). Either confirms the assignment -
+                        # Fear and Loathing's pocket feature carries Tolna's
+                        # Rift while the in-game area sits in the dungeon band.
+                        valid = False
+                        if current in bounds:
+                            b = bounds[current]
+                            valid = b[0][0] <= c[0] <= b[1][0] and b[0][1] <= c[1] <= b[1][1]
+                        if not valid and current in table_centers:
+                            tx, ty = table_centers[current]
+                            valid = ((c[0] - tx) ** 2 + (c[1] - ty) ** 2) ** 0.5 <= 384
+                if current is not None and not valid:
+                    replacement = containing_map(bounds, c[0], c[1])
+                    dropped.append((track, current, replacement))
+                    if replacement is not None:
+                        l["mapId"] = replacement
+                    else:
+                        l.pop("mapId", None)
+                elif current is None:
+                    # A table center within 160 tiles is effectively
+                    # membership - pockets are 128-256 tiles wide, and the
+                    # centers are precise where the bounds boxes are padded
+                    # (Dorgesh-Kaan's box swallows the Killerwatt pocket).
+                    # The misassignments this scheme replaced (Inferno ->
+                    # Mouse hole and friends) were all 190+ tiles out.
+                    best, best_d = None, None
+                    for mi, (tx, ty) in table_centers.items():
+                        if mi < 1:
+                            continue
+                        d = ((c[0] - tx) ** 2 + (c[1] - ty) ** 2) ** 0.5
+                        if best_d is None or d < best_d:
+                            best, best_d = mi, d
+                    replacement = best if best is not None and best_d <= 160 else None
+                    if replacement is None:
+                        replacement = containing_map(bounds, c[0], c[1])
+                    if replacement is not None:
+                        l["mapId"] = replacement
             if "mapId" in l:
                 used[l["mapId"]] = names.get(l["mapId"], "Unknown")
                 assigned += 1
-                if track == "Rat a Tat Tat" or track == "Rat Hunt":
-                    print(f"  {track} -> mapId {l['mapId']} ({names.get(l['mapId'])})")
             else:
                 unassigned.append((track, int(c[0]), int(c[1])))
+
+    for track, old, new in dropped:
+        print(f"  reassigned {track}: {old} -> {new}")
+
+    # Map-less instances: attach the curated place entrance to every non-surface
+    # location of tracks unlocking there, under a synthetic id. Applied to any
+    # band - the plugin prefers the entrance over projecting coordinates that no
+    # map renders.
+    place_ids = {}
+    try:
+        with open(WIKI_LOCATIONS) as f:
+            wiki_places = json.load(f)
+    except OSError:
+        wiki_places = {}
+    for track, locs in data.items():
+        place = (wiki_places.get(track) or "").strip()
+        if place not in PLACE_ENTRANCES:
+            # Tracks named after their place ("Temple of the Eye") sometimes
+            # lack a recorded unlock place; the name itself is the match.
+            place = track if track in PLACE_ENTRANCES else place
+        if place not in PLACE_ENTRANCES:
+            continue
+        if place not in place_ids:
+            place_ids[place] = PLACE_ENTRANCE_BASE_ID + len(place_ids) + 1
+        for l in locs:
+            c = l.get("center")
+            if c and len(c) >= 2 and c[1] >= 4160:
+                l["mapId"] = place_ids[place]
+                print(f"  place entrance {track}: '{place}' -> synthetic id {place_ids[place]}")
 
     entrances_out = {}
     missing_curation = []
@@ -189,6 +373,10 @@ def main():
         else:
             entrance, note = cur
             entrances_out[str(mi)] = {"name": name, "entrance": entrance, "note": note}
+
+    for place, pid in place_ids.items():
+        entrance, note = PLACE_ENTRANCES[place]
+        entrances_out[str(pid)] = {"name": place, "entrance": entrance, "note": note}
 
     # validate entrances
     for mi, e in entrances_out.items():

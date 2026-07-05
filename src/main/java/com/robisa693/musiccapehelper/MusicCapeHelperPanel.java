@@ -156,7 +156,7 @@ class MusicCapeHelperPanel extends PluginPanel
         wikiToggle.addMouseListener(new MouseAdapter()
         {
             @Override
-            public void mouseClicked(MouseEvent e)
+            public void mousePressed(MouseEvent e)
             {
                 setClickMode(ClickMode.WIKI);
             }
@@ -165,7 +165,7 @@ class MusicCapeHelperPanel extends PluginPanel
         mapToggle.addMouseListener(new MouseAdapter()
         {
             @Override
-            public void mouseClicked(MouseEvent e)
+            public void mousePressed(MouseEvent e)
             {
                 setClickMode(ClickMode.MAP);
             }
@@ -178,7 +178,7 @@ class MusicCapeHelperPanel extends PluginPanel
         clearLabel.addMouseListener(new MouseAdapter()
         {
             @Override
-            public void mouseClicked(MouseEvent e)
+            public void mousePressed(MouseEvent e)
             {
                 mapNavigator.clear();
             }
@@ -344,11 +344,11 @@ class MusicCapeHelperPanel extends PluginPanel
         row.addMouseListener(new MouseAdapter()
         {
             @Override
-            public void mouseClicked(MouseEvent e)
+            public void mousePressed(MouseEvent e)
             {
                 if (clickMode == ClickMode.MAP)
                 {
-                    mapNavigator.navigateTo(track.displayName, () -> resolveAndBrowse(track.displayName));
+                    mapNavigator.navigateTo(track.displayName, track.unlockHint, () -> resolveAndBrowse(track.displayName));
                 }
                 else
                 {
