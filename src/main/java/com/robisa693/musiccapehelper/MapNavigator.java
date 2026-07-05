@@ -54,7 +54,9 @@ class MapNavigator
     private Map<String, ZoneEntrance> entrances = new HashMap<>();
     private Map<String, String> wikiLocations = new HashMap<>();
     private final List<WorldMapPoint> activeMapPoints = new ArrayList<>();
-    private WorldPoint pendingTarget;
+    // A centering is owed to the user but no loaded map area could display a
+    // marker yet; retried on every WORLDMAP_LOADMAP until one can.
+    private boolean pendingCenter;
     private final BufferedImage mapIcon;
 
     // Active navigation target: written on the client thread, read by overlays
@@ -238,6 +240,12 @@ class MapNavigator
                         addMapPoint(overhead, label, undergroundMarker,
                             new net.runelite.api.Point(undergroundMarker.getWidth() / 2, 7));
                         addArea(areas, a.polygon, -UNDERGROUND_Y, true);
+                        // Also mark the actual spot: the client only draws a map point
+                        // when the loaded map area contains it, so this appears once the
+                        // user views the dungeon's own map area (e.g. by clicking its
+                        // entrance icon) while the projected marker shows on the surface.
+                        addMapPoint(a.point, a.name, mapIcon, null);
+                        addArea(areas, a.polygon, 0, false);
                         continue;
                     }
                 }
@@ -263,6 +271,10 @@ class MapNavigator
                         markers.add(new ActiveLocation(label, entry, null, null));
                         addMapPoint(entry, label, undergroundMarker,
                             new net.runelite.api.Point(undergroundMarker.getWidth() / 2, 7));
+                        // Mark the actual spot as well, drawn when the zone's own map
+                        // area is the one loaded in the world map widget.
+                        addMapPoint(a.point, a.name, mapIcon, null);
+                        addArea(areas, a.polygon, 0, false);
                     }
                 }
                 else
@@ -306,20 +318,24 @@ class MapNavigator
                         + " the dungeon or cave entrance nearby.", null);
             }
 
-            WorldPoint primary = nearestTo(playerLocation(), markers).point;
-
             if (isWorldMapOpen())
             {
-                // Map is already open: center it now. WORLDMAP_LOADMAP will not fire
-                // again for a region that is already loaded, so we cannot rely on onMapLoaded().
-                pendingTarget = null;
-                centerMap(primary);
+                // Map is already open: center it now if the loaded map area can display
+                // one of the markers. If it cannot (e.g. the player is underground so the
+                // map shows a dungeon area), stay pending - WORLDMAP_LOADMAP fires when
+                // the user switches map areas and onMapLoaded() retries.
+                pendingCenter = !centerOnLoadedMap();
+                if (pendingCenter)
+                {
+                    client.addChatMessage(ChatMessageType.GAMEMESSAGE, "",
+                        "Music Cape: switch the world map to the surface view to see the marker.", null);
+                }
             }
             else
             {
-                // Map is closed: remember the target and flash an indicator until the user
-                // opens the map (WORLDMAP_LOADMAP -> onMapLoaded fires when it first loads).
-                pendingTarget = primary;
+                // Map is closed: flash an indicator until the user opens the map
+                // (WORLDMAP_LOADMAP -> onMapLoaded fires when it loads).
+                pendingCenter = true;
                 showOpenMapIndicator(trackName);
             }
         });
@@ -435,14 +451,51 @@ class MapNavigator
     void onMapLoaded()
     {
         removeOpenMapInfoBox();
-        if (pendingTarget == null)
+        if (!pendingCenter)
         {
             return;
         }
-        WorldPoint target = pendingTarget;
-        pendingTarget = null;
-        log.debug("onMapLoaded: centering map on {}", target);
-        clientThread.invoke(() -> centerMap(target));
+        // A map area just loaded: the first open, or the user switched areas (surface
+        // globe, dungeon entrance icon). Center on the nearest marker this area can
+        // display; if it can display none, stay pending for the next area switch.
+        clientThread.invoke(() ->
+        {
+            if (pendingCenter && centerOnLoadedMap())
+            {
+                pendingCenter = false;
+            }
+        });
+    }
+
+    /**
+     * Centers the world map on the nearest active marker that the currently loaded
+     * map area can display. Returns false (and does not move the map) if it can
+     * display none of them.
+     */
+    private boolean centerOnLoadedMap()
+    {
+        List<ActiveLocation> displayable = new ArrayList<>();
+        for (WorldMapPoint point : activeMapPoints)
+        {
+            if (displayableOnLoadedMap(point.getWorldPoint()))
+            {
+                displayable.add(new ActiveLocation(point.getName(), point.getWorldPoint(), null, null));
+            }
+        }
+        if (displayable.isEmpty())
+        {
+            return false;
+        }
+        centerMap(nearestTo(playerLocation(), displayable).point);
+        return true;
+    }
+
+    /** Whether the map area currently loaded in the world map widget can draw this point. */
+    private boolean displayableOnLoadedMap(WorldPoint wp)
+    {
+        WorldMap wm = client.getWorldMap();
+        return wm != null && wm.getWorldMapData() != null
+            && wm.getWorldMapData().surfaceContainsPosition(wp.getX(), wp.getY());
     }
 
     private void centerMap(WorldPoint wp)
@@ -580,7 +633,7 @@ class MapNavigator
     private void clearActiveState()
     {
         removeOpenMapInfoBox();
-        pendingTarget = null;
+        pendingCenter = false;
         activeTrack = null;
         activeLocations = Collections.emptyList();
         mapAreas = Collections.emptyList();
