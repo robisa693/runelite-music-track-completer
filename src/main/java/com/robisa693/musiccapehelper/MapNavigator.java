@@ -38,8 +38,11 @@ class MapNavigator
     private static final Logger log = LoggerFactory.getLogger(MapNavigator.class);
     private static final Type MAP_TYPE = new TypeToken<Map<String, List<MapLocation>>>() {}.getType();
 
-    // World map surface coordinates stop below this y; anything at or above it is an
-    // underground / instanced region that the in-game world map cannot display.
+    // The Gielinor Surface map area covers y < 4160. The band from there up to
+    // y=6400 holds self-contained zones (Mor Ul Rek, the Inferno, raid and quest
+    // instances, ...), and everything at y >= 6400 is a dungeon mapped exactly
+    // 6400 tiles north of the ground it sits under.
+    private static final int SURFACE_MAX_Y = 4160;
     private static final int UNDERGROUND_Y = 6400;
 
     private final Plugin plugin;
@@ -257,7 +260,7 @@ class MapNavigator
                 if (zone.entrance != null && zone.entrance.size() >= 2)
                 {
                     WorldPoint entry = new WorldPoint(zone.entrance.get(0).intValue(), zone.entrance.get(1).intValue(), 0);
-                    if (entry.getY() < UNDERGROUND_Y)
+                    if (entry.getY() < SURFACE_MAX_Y)
                     {
                         entranceZone = zone;
                         if (undergroundMarker == null)
@@ -325,7 +328,8 @@ class MapNavigator
                 if (pendingCenter)
                 {
                     client.addChatMessage(ChatMessageType.GAMEMESSAGE, "",
-                        "Music Cape: switch the world map to the surface view to see the marker.", null);
+                        "Music Cape: switch the world map to Gielinor Surface (dropdown in the"
+                            + " top-left of the map) to see the marker.", null);
                 }
             }
             else
@@ -517,14 +521,12 @@ class MapNavigator
 
     boolean isSurface(ActiveLocation a)
     {
-        // A location is on the surface world map when it is below the dungeon
-        // coordinate band AND the wiki draws it on the main map rather than a
-        // separate zone map (mapId - e.g. Mor Ul Rek, the Inferno, Sorceress's
-        // Garden all sit in off-map coordinate pockets below y=6400). Never ask
-        // the world map widget: WorldMapData reflects whichever map area is
-        // currently loaded, so with the player underground it rejects ordinary
-        // surface coordinates and every track fell back to the wiki.
-        return a.point.getY() < UNDERGROUND_Y && a.mapId == null;
+        // The Gielinor Surface map area ends at y=4160; everything above that is a
+        // self-contained zone or dungeon regardless of mapId. Never ask the world
+        // map widget: WorldMapData reflects whichever map area is currently loaded,
+        // so with the player underground it rejects ordinary surface coordinates
+        // and every track fell back to the wiki.
+        return a.point.getY() < SURFACE_MAX_Y;
     }
 
     private void addMapPoint(WorldPoint wp, String name, BufferedImage image, net.runelite.api.Point imagePoint)

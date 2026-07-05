@@ -143,6 +143,17 @@ ENTRANCES = {
 }
 
 
+# Curated: tracks whose pocket has no map of its own on the wiki, so the
+# nearest-center assignment picks a wrong neighbour (all three would get
+# 10114 "Mouse hole"). Maps track name -> mapId, or None for instanced
+# areas with no map at all (the plugin falls back to the wiki for those).
+MAPID_OVERRIDES = {
+    "Inferno": 23,           # unlocks entering Mor Ul Rek (wiki: Mor Ul Rek)
+    "Darkly Altared": None,  # Skotizo's chamber
+    "Monkey Sadness": None,  # Glough's laboratory (MM2 instance)
+}
+
+
 def main():
     wt = get_wikitext(MAPIDS_PAGE)
     if not wt:
@@ -163,7 +174,13 @@ def main():
             c = l.get("center")
             if not c or len(c) < 3 or not (4160 <= c[1] < 6400):
                 continue
-            if "mapId" not in l:
+            if track in MAPID_OVERRIDES:
+                override = MAPID_OVERRIDES[track]
+                if override is None:
+                    l.pop("mapId", None)
+                else:
+                    l["mapId"] = override
+            elif "mapId" not in l:
                 best, bd = None, float("inf")
                 for mi, mn, mx, my in mid:
                     dist = (c[0] - mx) ** 2 + (c[1] - my) ** 2
