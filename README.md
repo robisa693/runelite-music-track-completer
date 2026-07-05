@@ -12,7 +12,7 @@ A RuneLite plugin that helps you complete the music log and unlock the **music c
 - Unlock state persisted between sessions
 - **Wiki mode** – click any track to open its OSRS Wiki page for full details
 - **Map mode** – click any track to mark its unlock location:
-  - The **world map** jumps to the spot and shows the unlock **area highlighted** (not just a dot), for every known location of the track
+  - The **world map** jumps to the spot and shows the unlock **area highlighted**, for every known location of the track
   - If the map is closed, a flashing **infobox** reminds you to open it
   - When you get near the spot, the tile is **highlighted on the ground** with the track name, and a **hint arrow** points to it — this works in **dungeons and caves** too, where the world map can't reach
   - **Underground tracks** (e.g. Sarachnis in Forthos Dungeon) mark the **surface area directly above the dungeon** on the world map with a red **UNDERGROUND** badge, and the dungeon outline projected onto the ground above — head there, find the entrance, and the in-game highlight takes over once you're inside
@@ -22,7 +22,7 @@ A RuneLite plugin that helps you complete the music log and unlock the **music c
 
 ## Why?
 
-The in-game music player already shows locked tracks, but it's tedious to scroll through every area and read each tooltip one by one. This plugin lists all unlock hints at once, grouped by area, and then actually takes you there: pick a missing track, jump the world map to its unlock area, and follow the on-the-ground highlight for the final steps — like the clue scroll helper, but for music tracks.
+The in-game music player already shows locked tracks, but it's tedious to scroll through every area and read each tooltip one by one. This plugin lists all unlock hints at once, and then actually takes you there: pick a missing track, jump the world map to its unlock area, and follow the on-the-ground highlight for the final steps — like the clue scroll helper, but for music tracks.
 
 ## Usage
 
@@ -56,13 +56,19 @@ The plugin ships three data files in `src/main/resources`, all generated from th
 | `map_entrances.json` | Surface entrance per named zone (wiki mapID): `{"<mapId>": {"name", "entrance": [x,y]\|null, "note"}}` | `scripts/gen_map_entrances.py` (curated table inside) |
 | `wiki_locations.json` | Human-readable unlock place per track (wiki infobox `location` field) | `scripts/scrape_wiki_locations.py` |
 
+What each script does:
+
+1. **`scrape_track_coords.py`** — walks every page in the wiki's *Category:Music_tracks* and extracts unlock locations from `{{Map|…}}` kartographer templates (inline and on `Map:<Track>` subpages): polygon outlines, centers, planes, and the wiki `mapID` of the map each highlight sits on. Tracks the wiki marks as *Missing track location* get an intentionally empty list.
+2. **`gen_map_entrances.py`** — for zones with no geometric relation to the surface (Rat Pits, God Wars Dungeon, Zanaris, minigames — the y 4160–6400 band), fetches the wiki's official mapID table, assigns each such location its named zone (nearest map center), and emits the entrance file from the **hand-curated `ENTRANCES` table at the top of the script** — the only human-maintained data in the pipeline. Needs `track_coords.json` to exist, so run it after 1.
+3. **`scrape_wiki_locations.py`** — grabs each track's infobox `location` field ("Tombs of Amascut") so the plugin can say where a track unlocks when the map can't show it. Independent of the other two.
+
 ### Automated updates
 
 ```bash
 pip install requests
-python3 scripts/scrape_track_coords.py      # full re-scrape of all track pages (~10 min, rate-limited)
-python3 scripts/gen_map_entrances.py        # re-assign zones + regenerate entrance file
-python3 scripts/scrape_wiki_locations.py    # refresh unlock place names
+python3 scripts/scrape_track_coords.py      # 1. full re-scrape of all track pages (~10 min, rate-limited)
+python3 scripts/gen_map_entrances.py        # 2. re-assign zones + regenerate entrance file (needs 1's output)
+python3 scripts/scrape_wiki_locations.py    # 3. refresh unlock place names (independent)
 ```
 
 The scrapers are polite (0.35 s between requests) — please keep them that way. Rebuild with `./gradlew jar` and side-load the jar to verify before opening a PR.
