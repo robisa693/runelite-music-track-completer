@@ -32,6 +32,7 @@ import net.runelite.client.ui.overlay.infobox.InfoBox;
 import net.runelite.client.ui.overlay.infobox.InfoBoxManager;
 import net.runelite.client.ui.overlay.worldmap.WorldMapPoint;
 import net.runelite.client.ui.overlay.worldmap.WorldMapPointManager;
+import net.runelite.client.util.ColorUtil;
 
 class MapNavigator
 {
@@ -54,6 +55,9 @@ class MapNavigator
     private final Gson gson;
 
     private static final String GIELINOR_SURFACE = "Gielinor Surface";
+    // Dark blue reads well on the beige chatbox, unlike the configurable map
+    // highlight colors, which default to amber/red.
+    private static final Color CHAT_AREA_COLOR = new Color(0, 0, 205);
 
     private Map<String, List<MapLocation>> coordsMap = new HashMap<>();
     private Map<String, ZoneEntrance> entrances = new HashMap<>();
@@ -250,6 +254,12 @@ class MapNavigator
         return pendingCenter ? suggestedArea : null;
     }
 
+    /** Wraps an area name in a chat color tag so it stands out in the message. */
+    private static String chatHighlight(String name)
+    {
+        return ColorUtil.wrapWithColorTag("'" + name + "'", CHAT_AREA_COLOR);
+    }
+
     /** "It unlocks at: X." when the wiki knows the place, otherwise "". */
     private String unlockPlace(String trackName)
     {
@@ -420,8 +430,8 @@ class MapNavigator
             String exactArea = areaNameFor(nearestTo(playerLocation(), parsed).point);
             suggestedArea = exactArea != null ? exactArea : GIELINOR_SURFACE;
             String mapListHint = exactArea != null && !exactArea.equals(GIELINOR_SURFACE)
-                ? " You can also open the map list at the bottom of the world map and select '"
-                    + exactArea + "' to see the exact spot."
+                ? " Pick " + chatHighlight(exactArea) + " in the map list (bottom of the map)"
+                    + " to see the exact spot."
                 : "";
 
             if (!hasSurface && entranceZone != null)
@@ -429,15 +439,15 @@ class MapNavigator
                 String note = entranceZone.note != null ? " (" + entranceZone.note + ")" : "";
                 client.addChatMessage(ChatMessageType.GAMEMESSAGE, "",
                     "Music Cape: " + trackName + " unlocks inside " + entranceZone.name
-                        + ", UNDERGROUND. The red marker on the world map is the entrance" + note + "."
+                        + ", UNDERGROUND - the red marker is the entrance" + note + "."
                         + mapListHint, null);
             }
             else if (!hasSurface && overheadUsed)
             {
                 client.addChatMessage(ChatMessageType.GAMEMESSAGE, "",
-                    "Music Cape: " + trackName + " unlocks UNDERGROUND. The red 'UNDERGROUND' marker on"
-                        + " the world map is the surface directly above it - travel there, then look for"
-                        + " the dungeon or cave entrance nearby." + mapListHint, null);
+                    "Music Cape: " + trackName + " unlocks UNDERGROUND - the red marker on the"
+                        + " world map is the surface above it; find the entrance nearby."
+                        + mapListHint, null);
             }
 
             if (isWorldMapOpen())
@@ -451,8 +461,8 @@ class MapNavigator
                 if (pendingCenter)
                 {
                     client.addChatMessage(ChatMessageType.GAMEMESSAGE, "",
-                        "Music Cape: open the map list at the bottom of the world map and select '"
-                            + suggestedArea + "' to see the marker.", null);
+                        "Music Cape: pick " + chatHighlight(suggestedArea)
+                            + " in the map list at the bottom of the world map to see the marker.", null);
                 }
             }
             else
